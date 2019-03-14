@@ -1,1 +1,37 @@
-{"enzymes_to_avoid": ["BsaI", "BsmBI", "NotI", "BamHI", "BbsI", "BglII", "EcoRI", "PstI", "SpeI", "XbaI", "XhoI"], "patterns_to_avoid": [], "parts": {"type 8": {"left_flank": "GCATCGTCTCATCGGTCTCACCGA", "right_compatibility": "type 1", "right_flank": "CCCTTGAGACCTGAGACGGCAT", "left_compatibility": "type 7"}, "type 5": {"left_flank": "GCATCGTCTCATCGGTCTCAGCTG", "right_compatibility": "type 6", "right_flank": "TACATGAGACCTGAGACGGCAT", "left_compatibility": "type 4"}, "type 8a": {"left_flank": "GCATCGTCTCATCGGTCTCACCGA", "right_compatibility": "type 8b", "right_flank": "CAATTGAGACCTGAGACGGCAT", "left_compatibility": "type 7"}, "type 4a": {"left_flank": "GCATCGTCTCATCGGTCTCAATCC", "right_compatibility": "type 4b", "right_flank": "TAACTCGAGTGGCTGAGACCTGAGACGGCAT", "left_compatibility": "type 3"}, "type 3a": {"left_flank": "GCATCGTCTCATCGGTCTCATATG", "right_compatibility": "type 3b", "right_flank": "GGTTCTTGAGACCTGAGACGGCAT", "left_compatibility": "type 2"}, "type 4b": {"left_flank": "GCATCGTCTCATCGGTCTCATGGC", "right_compatibility": "type 5", "right_flank": "GCTGTGAGACCTGAGACGGCAT", "left_compatibility": "type 4a"}, "type 4": {"left_flank": "GCATCGTCTCATCGGTCTCAATCC", "right_compatibility": "type 5", "right_flank": "GCTGTGAGACCTGAGACGGCAT", "left_compatibility": "type 3"}, "type 7": {"left_flank": "GCATCGTCTCATCGGTCTCAGAGT", "right_compatibility": "type 8", "right_flank": "CCGATGAGACCTGAGACGGCAT", "left_compatibility": "type 6"}, "type 2": {"left_flank": "GCATCGTCTCATCGGTCTCAAACG", "right_compatibility": "type 3", "right_flank": "TATGTGAGACCTGAGACGGCAT", "left_compatibility": "type 1"}, "type 1": {"left_flank": "GCATCGTCTCATCGGTCTCACCCT", "right_compatibility": "type 2", "right_flank": "AACGTGAGACCTGAGACGGCAT", "left_compatibility": "type 8"}, "type 3": {"left_flank": "GCATCGTCTCATCGGTCTCATTCT", "right_compatibility": "type 4", "right_flank": "GGATCCTGAGACCTGAGACGGCAT", "left_compatibility": "type 3a"}, "type 6": {"left_flank": "GCATCGTCTCATCGGTCTCATACA", "right_compatibility": "type 7", "right_flank": "GAGTTGAGACCTGAGACGGCAT", "left_compatibility": "type 5"}, "type 8b": {"left_flank": "GCATCGTCTCATCGGTCTCACAAT", "right_compatibility": "type 1", "right_flank": "CCCTTGAGACCTGAGACGGCAT", "left_compatibility": "type 8a"}}, "type_required": true}
+{
+	"enzymes_to_avoid": 
+		["BsaI", "BsmBI", "NotI", "BamHI", "BbsI", "BglII", "EcoRI", "PstI", "SpeI", "XbaI", "XhoI"],
+	"patterns_to_avoid": 
+	 	[], 
+	"parts": 
+	 	{
+	 		"type 8": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCACCGA", "right_compatibility": "type 1", "right_flank": "CCCTTGAGACCTGAGACGGCAT", "left_compatibility": "type 7"}, 
+	 		"type 5": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCAGCTG", "right_compatibility": "type 6", "right_flank": "TACATGAGACCTGAGACGGCAT", "left_compatibility": "type 4"}, 
+	 		"type 8a": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCACCGA", "right_compatibility": "type 8b", "right_flank": "CAATTGAGACCTGAGACGGCAT", "left_compatibility": "type 7"}, 
+	 		"type 4a": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCAATCC", "right_compatibility": "type 4b", "right_flank": "TAACTCGAGTGGCTGAGACCTGAGACGGCAT", "left_compatibility": "type 3"}, 
+	 		"type 3a": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCATATG", "right_compatibility": "type 3b", "right_flank": "GGTTCTTGAGACCTGAGACGGCAT", "left_compatibility": "type 2"}, 
+	 		"type 3":
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCATATG", "right_compatibility": "type 4", "right_flank": "GGATCCTGAGACCTGAGACGGCAT", "left_compatibility": "type 2"},
+	 		"type 4b": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCATGGC", "right_compatibility": "type 5", "right_flank": "GCTGTGAGACCTGAGACGGCAT", "left_compatibility": "type 4a"}, 
+	 		"type 4": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCAATCC", "right_compatibility": "type 5", "right_flank": "GCTGTGAGACCTGAGACGGCAT", "left_compatibility": "type 3"}, 
+	 		"type 7": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCAGAGT", "right_compatibility": "type 8", "right_flank": "CCGATGAGACCTGAGACGGCAT", "left_compatibility": "type 6"}, 
+	 		"type 2": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCAAACG", "right_compatibility": "type 3", "right_flank": "TATGTGAGACCTGAGACGGCAT", "left_compatibility": "type 1"}, 
+	 		"type 1": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCACCCT", "right_compatibility": "type 2", "right_flank": "AACGTGAGACCTGAGACGGCAT", "left_compatibility": "type 8"}, 
+	 		"type 3b": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCATTCT", "right_compatibility": "type 4", "right_flank": "GGATCCTGAGACCTGAGACGGCAT", "left_compatibility": "type 3a"}, 
+	 		"type 6": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCATACA", "right_compatibility": "type 7", "right_flank": "GAGTTGAGACCTGAGACGGCAT", "left_compatibility": "type 5"}, 
+	 		"type 8b": 
+	 			{"left_flank": "GCATCGTCTCATCGGTCTCACAAT", "right_compatibility": "type 1", "right_flank": "CCCTTGAGACCTGAGACGGCAT", "left_compatibility": "type 8a"}
+	 	}, 
+	 "type_required": true}

@@ -1,5 +1,35 @@
 #!/home/rdkibler/.conda/envs/domesticator/bin/python
 
+
+
+
+import unittest
+
+class TestExample(self):
+	#using assertEquals, assertTrue, etc from unittest is nice b/c the error messages are good
+
+	def setUp(self): 
+		#runs before every test
+
+	def tearDown(self):
+		#runs after every test
+
+	def test_basic(self):
+		self.assertEquals(True,True)
+
+##also look into pytest
+
+
+
+
+
+
+#New features I want:
+#	only optimize coding sequences
+#	optimize against hairpins globally (even between coding and non-coding sequences)
+
+
+
 #What I want this to do is take a protein sequence and convert it into an orderable gblock
 #to do this, it'll need 
 #	1. the protein sequence, 
@@ -35,6 +65,7 @@ from Bio.Alphabet import IUPAC
 import constraints
 import objectives
 
+
 print("parsing arguments")
 parser=argparse.ArgumentParser()
 
@@ -47,25 +78,27 @@ parser.add_argument("--sequence_name", "-n",dest="name",help="Use with --dna_seq
 parser.add_argument("--cds",dest="is_cds",action="store_true",default=True, help="I assume that any DNA sequence given to me is a CoDing Sequence (CDS) unless specified")
 
 #Cloning Arguments
-parser.add_argument("--cloning_scheme", "-c", dest="scheme", help="Specifies the overhang type and the specific patterns/restriction sites to avoid. Do not set flag if you don\'t want to apply a cloning scheme. Options are: \'MoClo-YTK\', [more coming soon]")
-parser.add_argument("--custom_cloning", dest="cloning_path",help="supply specifications for a custom cloning scheme")
+parser.add_argument("--cloning_scheme", "-c", dest="scheme", help="Specifies the overhang type and the specific patterns/restriction sites to avoid. Do not set flag if you don\'t want to apply a cloning scheme. Options are: \'MoClo-YTK\', [more coming soon] TODO: pet29_for_idt")
+#parser.add_argument("--custom_cloning", dest="cloning_path",help="supply specifications for a custom cloning scheme")
 parser.add_argument("--part_type", "-t",dest="type",help="The type to domesticate the input sequence as according to the cloning_scheme selected")
 parser.add_argument("--right_flank",dest="right_flank", help="overrides the selected cloning scheme\'s 3\' flank")
 parser.add_argument("--left_flank",dest="left_flank", help="overrides the selected cloning scheme\'s 5\' flank")
-parser.add_argument("--primers_only",dest="primers_only", action="store_true",default=False,help="overrides all sequence optimization, outputs primers that will convert an existing sequence into a usable part. Incompatible with --protein_sequence and --protien_fasta")
-parser.add_argument("--conversion_primers",dest="types", help="report primers that can be used to convert the designed part into other parts, specified as a comma-separated list")
-parser.add_argument("--max_primer_len",dest="primer_len", type=int,default=60,help="use with --primers_only flag. default is %(default)d")
+#parser.add_argument("--primers_only",dest="primers_only", action="store_true",default=False,help="overrides all sequence optimization, outputs primers that will convert an existing sequence into a usable part. Incompatible with --protein_sequence and --protien_fasta")
+#parser.add_argument("--conversion_primers",dest="types", help="report primers that can be used to convert the designed part into other parts, specified as a comma-separated list")
+#parser.add_argument("--max_primer_len",dest="primer_len", type=int,default=60,help="use with --primers_only flag. default is %(default)dC")
+#parser.add_argument("--primer_min_tm",dest="primer_min_tm", type=float,default=58.0,help="TODO:implement")
 
 #Optimization Arguments
-parser.add_argument("--avoid_kmers", dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
+parser.add_argument("--avoid_kmers", type=int, dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
+parser.add_argument("--avoid_kmers_boost", type=float, dest="kmer_boost", default=10.0, help="TODO: fill out this help. Default to %(default)s")
 parser.add_argument("--avoid_patterns", dest="avoid_patterns", help="DNA sequence patterns to avoid, listed as a comma separated list (no spaces!)")
 parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="The names of the enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII")
 parser.add_argument("--species", "-s", dest="species", default="e_coli", help="specifies the codon bias table to use as a comma separated list. Options are: e_coli, s_cerevisiae. Defaults to %(default)s")
 parser.add_argument("--codon_bias_table", dest="codon_bias_table_filename", help="overrides species, gives a custom codon bias table. See <NEED EXAMPLE> for example of formatting")
-parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to not harmonized", default=False, action="store_true")
+parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to %(default)s", default=False, action="store_true")
 parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", action="store_true", default=True, help="homopolymers can complicate synthesis. We minimize them by default, but you can turn this off")
 parser.add_argument("--avoid_hairpints", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
-parser.add_argument("--optimize_terminal_GC_content")
+parser.add_argument("--optimize_terminal_GC_content", action="store_true", default=True, help="TODO: need to implement this AND write a helpful help")
 #some argument for avoiding other kmer repeats?
 #some argument for avoiding homopolymer?
 
@@ -73,16 +106,26 @@ parser.add_argument("--optimize_terminal_GC_content")
 parser.add_argument("--output_mode", dest="output_mode", default="print", help="supported output modes: print (to terminal) (default), fasta, or genbank. If no output_filename is supplied but a non-print option is selected, it'll just use the name of the input (from the fasta file) or \"gblock###\" if none specified.")
 parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="gblocks")
 
+
 args = parser.parse_args()
+
+
+
+
+
+
 
 #Handle Argument Requirements
 if args.primers_only is True and (args.protein_sequence or args.protein_fasta):
 	sys.exit("Error: can't create primers with protein sequences")
 num_of_required_set = sum(((args.dna_sequence is not None), (args.protein_sequence is not None), (args.protein_fasta is not None), (args.dna_fasta is not None)))
 if num_of_required_set == 0:
-	sys.exit("I know \"required options\" are kind of dumb, but I use them. One of the following must be supplied: --dna_sequence, --protein_sequence, --dna_fasta, or --protein_fasta. See --help for more information")
+	sys.exit("I know \"required options\" are kind of dumb, but I use them so deal with it. I suppose I should implement this as a group."
+		 "One of the following must be supplied: --dna_sequence, --protein_sequence, --dna_fasta, or --protein_fasta. See --help for "
+		 "more information")
 if num_of_required_set >1:
-	sys.exit("Only one of the following may be supplied:  --dna_sequence, --protein_sequence, --dna_fasta, or --protein_fasta. You supplied %d. See --help for more information" % num_of_required_set)
+	sys.exit("Only one of the following may be supplied:  --dna_sequence, --protein_sequence, --dna_fasta, or --protein_fasta. "
+		 "You supplied %d. See --help for more information" % num_of_required_set)
 if args.cloning_path:
 	sys.exit("custom cloning schemes are not yet supported")
 
@@ -93,6 +136,7 @@ print("loading sequences")
 global_constraints = []
 global_objectives = []
 SeqRecords = []
+
 #Load in the sequences
 if args.dna_sequence:
 	SeqRecords.append(SeqRecord(Seq(args.dna_sequence, IUPAC.unambiguous_dna),name=args.name,id=args.name))
@@ -112,7 +156,7 @@ local_constraints = [None] * len(SeqRecords)
 for sr in SeqRecords:
 	#TODO check if it has a name. If not, give it a default name and a number
 	if args.is_cds:
-		print("SHOULD I BE USING FEATURES OR ANNOTATIONS?")
+		print("SHOULD I BE USING FEATURES OR ANNOTATIONS? Dude. Fix this.")
 		sr.features.append(SeqFeature(location=FeatureLocation(0,len(sr.seq)),type="CDS",strand=1,id=sr.id)) #indicate cds
 		sr.annotations["species"]= "optimized for %s" % (args.species)
 		sr.annotations["source"] = "de novo"
@@ -152,7 +196,7 @@ if cloning_file is not "":
 		#	global_constraints.append(AvoidPattern(pattern))
 		#for enzyme in scheme['enzymes_to_avoid']:
 		#	global_constraints.append(AvoidPattern(enzyme_pattern(enzyme)))
-		
+
 		for sr in SeqRecords:
 			#TODO
 			#store part type in annotation/whatever
@@ -202,7 +246,7 @@ if args.avoid_restriction_sites:
 print("loading global objectives")
 #load objectives
 if args.avoid_kmers > 0:
-	global_objectives.append(objectives.MinimizeKmerScore(k = args.avoid_kmers))
+	global_objectives.append(objectives.MinimizeKmerScore(k = args.avoid_kmers, boost = args.kmer_boost))
 if args.is_cds:
 	print("optimizing for:")
 	for species in args.species.split(","):
@@ -271,18 +315,25 @@ print("finish optimization")
 print("outputting")
 
 outname = args.output_filename
-if outname is None:
-	outname = "gblocks"
-outext = ""
+
+args.output_mode = args.output_mode.strip().lower()
+
+#outext = ""
 #TODO this is messy. Use BioPython's built in type checker and just clean up input a bit (lower case, etc). Catch errors and then default to terminal.
-if args.output_mode is "fasta":
-	outext = ".fasta"
-	sys.exit("not implemented")
-elif args.output_mode is "genbank":
-	outext = ".gb"
+if args.output_mode == "fasta":
+	if outname is None:
+		outname = "gblocks.fasta"
+	#outext = ".fasta"
+	for sr in SeqRecords:
+		with open(outname, 'w') as f:
+			f.write(sr.format("fasta"))
+elif args.output_mode == "genbank":
+	if outname is None:
+		outname = "gblocks.gb"
+	#outext = ".gb"
 	sys.exit("not implemented")
 else:
-	if args.output_mode is not "print":
+	if args.output_mode != "print":
 		print("output mode not recognized")
 	print("Printing to terminal")
 	for sr in SeqRecords:
