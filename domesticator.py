@@ -2,21 +2,6 @@
 
 
 
-
-import unittest
-
-class TestExample(self):
-	#using assertEquals, assertTrue, etc from unittest is nice b/c the error messages are good
-
-	def setUp(self): 
-		#runs before every test
-
-	def tearDown(self):
-		#runs after every test
-
-	def test_basic(self):
-		self.assertEquals(True,True)
-
 ##also look into pytest
 
 
@@ -27,7 +12,6 @@ class TestExample(self):
 #New features I want:
 #	only optimize coding sequences
 #	optimize against hairpins globally (even between coding and non-coding sequences)
-
 
 
 #What I want this to do is take a protein sequence and convert it into an orderable gblock
@@ -46,7 +30,6 @@ class TestExample(self):
 #default behavior will be to codon optimize a cds
 #I plan on optimizing I definitely want to be able to optimize a sequence for synthesis/GC content while preserving patterns, however, I will not be implementing that right away
 
-print("importing libraries")
 import sys
 
 database='/home/rdkibler/projects/domesticator/database/'
@@ -64,50 +47,208 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
 import constraints
 import objectives
+import os
 
 
-print("parsing arguments")
-parser=argparse.ArgumentParser()
+# NON_DNA_SYMBOLS = ['R','N','D','Q','E','H','I','L','K','M','F','P','S','W','Y','V', '*']
+# NON_DNA_NON_PROTEIN_SYMBOLS = ['J','O','X','Z']
+
+# def detect_input_mode(input_string):
+# 	try:
+# 		f = open(input_string, 'r')
+# 		input_string = f.readline()
+# 		if ">" in input_string:
+# 			input_string = f.readline()
+# 		is_file = True
+# 		f.close()
+# 	except FileNotFoundError:
+# 		is_file = False
+# 	except OSError:
+# 		is_file = False
+
+# 	input_type = None
+# 	for char in input_string.upper():
+# 		if char in NON_DNA_NON_PROTEIN_SYMBOLS:
+# 			exit("input not recognized: %s" % input_string)
+# 		if char in NON_DNA_SYMBOLS:
+# 			if is_file:
+# 				input_type = "protein_fasta"
+# 			else:
+# 				input_type = "protein_seq"
+# 			break
+# 	if not input_type:
+# 		if is_file:
+# 			input_type = "dna_fasta"
+# 			exit("dna_fasta unimplemented")
+# 		else:
+# 			input_type = "dna_seq"
+
+# 	return input_type
+
+
+
+# def input_reader(input_string, input_mode):
+# 	if input_mode == 'automatic':
+# 		input_mode = detect_input_mode(input_string)
+# 	elif input_mode == 'protein_seq':
+# 		return Seq(reverse_translate(input_string), IUPAC.unambiguous_dna)
+# 	elif input_mode == 'dna_seq':
+# 		return Seq(input_string, IUPAC.unambiguous_dna)
+# 	elif input_mode == 'protein_fasta':
+# 		exit("protein_fasta not implemented")
+# 	elif input_mode == 'dna_fasta':
+# 		exit("dna_fasta not implemented")
+# 	else:
+# 		exit("unknown input mode")
+
+	
+		
+# 		#gotta determine type
+
+
+
+# 		exit()
+
+
+# 	#before returning, make sure the seq is divisible by 3
+# 	return #type should be Bio.Seq I think 
+
+
+
+def vector_reader(filename, insert_seq, destination_label):
+	''' func descriptor '''
+
+	print("vector_reader")
+	print(filename)
+	for x in SeqIO.parse(filename, "genbank"):
+		print(x)
+		print([feat.qualifiers['label'] for feat in x.features if feat.type[:3] == 'dom_destination'])
+		print(x.annotations)
+
+	exit()
+
+	#Need to fined the dom_destination feature type which has the same label as destination_label
+	#scream loudly if this wasn't found.
+
+	#replace the destination sequence with the insert_seq
+
+	#did the other features move around? 
+
+	#find the constraints and objectives. How are these stored?
+	#use keywords for global constraints/objectives
+	#can I use features for local constraints/objectives?
+
+
+	#This seq should be a SeqRecord object
+	return seq, constraints, objectives
+
+
+
+def vector_writer():
+	pass
+
+
+parser=argparse.ArgumentParser(prog='domesticator', description='TODO: write description')
+
+parser.add_argument('--version', action='version', version='%(prog)s 0.2')
 
 #Input Arguments
-parser.add_argument("--dna_sequence","-d",dest="dna_sequence",help="DNA sequence you want to optimize. Required and mutaually exclusive with --protein_sequence, --dna_fasta, and --protein_fasta.")
-parser.add_argument("--protein_sequence","-p",dest="protein_sequence",help="protein sequence you want to back translate and optimize. Required and mutually exclusive with --dna_sequence, dna_fasta, and protein_fasta")
-parser.add_argument("--dna_fasta","-D",dest="dna_fasta",help="fasta file containing dna sequences you want to optimize")
-parser.add_argument("--protein_fasta","-P",dest="protein_fasta",help="fasta file containing protein sequences you want to back translate and optimize")
-parser.add_argument("--sequence_name", "-n",dest="name",help="Use with --dna_sequence or --protein_sequence. Specify the name to be associated with the inputted sequence. default to %(default)s", default="gblock")
-parser.add_argument("--cds",dest="is_cds",action="store_true",default=True, help="I assume that any DNA sequence given to me is a CoDing Sequence (CDS) unless specified")
+#parser.add_argument("--dna_sequence","-d",dest="dna_sequence",help="DNA sequence you want to optimize. Required and mutaually exclusive with --protein_sequence, --dna_fasta, and --protein_fasta.")
+#parser.add_argument("--protein_sequence","-p",dest="protein_sequence",help="protein sequence you want to back translate and optimize. Required and mutually exclusive with --dna_sequence, dna_fasta, and protein_fasta")
+#parser.add_argument("--dna_fasta","-D",dest="dna_fasta",help="fasta file containing dna sequences you want to optimize")
+#parser.add_argument("--protein_fasta","-P",dest="protein_fasta",help="fasta file containing protein sequences you want to back translate and optimize")
+#parser.add_argument("--sequence_name", "-n",dest="name",help="Use with --dna_sequence or --protein_sequence. Specify the name to be associated with the inputted sequence. default to %(default)s", default="gblock")
+#parser.add_argument("--cds",dest="is_cds",action="store_true",default=True, help="I assume that any DNA sequence given to me is a CoDing Sequence (CDS) unless specified")
+input_parser = parser.add_argument_group(title="Input Options", description=None)
+input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Types are automatically determined. If this fails, set --input_mode to the input type.")
+input_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="HELP MESSAGE")
+input_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
+input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_fasta_file", 	help="Input mode. Protein fasta file by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
 
 #Cloning Arguments
-parser.add_argument("--cloning_scheme", "-c", dest="scheme", help="Specifies the overhang type and the specific patterns/restriction sites to avoid. Do not set flag if you don\'t want to apply a cloning scheme. Options are: \'MoClo-YTK\', [more coming soon] TODO: pet29_for_idt")
+#parser.add_argument("--cloning_scheme", "-c", dest="scheme", help="Specifies the overhang type and the specific patterns/restriction sites to avoid. Do not set flag if you don\'t want to apply a cloning scheme. Options are: \'MoClo-YTK\', [more coming soon] TODO: pet29_for_idt")
 #parser.add_argument("--custom_cloning", dest="cloning_path",help="supply specifications for a custom cloning scheme")
-parser.add_argument("--part_type", "-t",dest="type",help="The type to domesticate the input sequence as according to the cloning_scheme selected")
-parser.add_argument("--right_flank",dest="right_flank", help="overrides the selected cloning scheme\'s 3\' flank")
-parser.add_argument("--left_flank",dest="left_flank", help="overrides the selected cloning scheme\'s 5\' flank")
+#parser.add_argument("--part_type", "-t",dest="type",help="The type to domesticate the input sequence as according to the cloning_scheme selected")
+#parser.add_argument("--right_flank",dest="right_flank", help="overrides the selected cloning scheme\'s 3\' flank")
+#parser.add_argument("--left_flank",dest="left_flank", help="overrides the selected cloning scheme\'s 5\' flank")
 #parser.add_argument("--primers_only",dest="primers_only", action="store_true",default=False,help="overrides all sequence optimization, outputs primers that will convert an existing sequence into a usable part. Incompatible with --protein_sequence and --protien_fasta")
 #parser.add_argument("--conversion_primers",dest="types", help="report primers that can be used to convert the designed part into other parts, specified as a comma-separated list")
 #parser.add_argument("--max_primer_len",dest="primer_len", type=int,default=60,help="use with --primers_only flag. default is %(default)dC")
 #parser.add_argument("--primer_min_tm",dest="primer_min_tm", type=float,default=58.0,help="TODO:implement")
 
+optimizer_parser = parser.add_argument_group(title="Optimizer Options", description=None)
 #Optimization Arguments
-parser.add_argument("--avoid_kmers", type=int, dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
-parser.add_argument("--avoid_kmers_boost", type=float, dest="kmer_boost", default=10.0, help="TODO: fill out this help. Default to %(default)s")
-parser.add_argument("--avoid_patterns", dest="avoid_patterns", help="DNA sequence patterns to avoid, listed as a comma separated list (no spaces!)")
-parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="The names of the enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII")
-parser.add_argument("--species", "-s", dest="species", default="e_coli", help="specifies the codon bias table to use as a comma separated list. Options are: e_coli, s_cerevisiae. Defaults to %(default)s")
-parser.add_argument("--codon_bias_table", dest="codon_bias_table_filename", help="overrides species, gives a custom codon bias table. See <NEED EXAMPLE> for example of formatting")
-parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to %(default)s", default=False, action="store_true")
-parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", action="store_true", default=True, help="homopolymers can complicate synthesis. We minimize them by default, but you can turn this off")
-parser.add_argument("--avoid_hairpints", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
-parser.add_argument("--optimize_terminal_GC_content", action="store_true", default=True, help="TODO: need to implement this AND write a helpful help")
+optimizer_parser.add_argument("--avoid_kmers", type=int, dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
+optimizer_parser.add_argument("--avoid_kmers_boost", type=float, dest="kmer_boost", default=10.0, help="TODO: fill out this help. Default to %(default)s")
+optimizer_parser.add_argument("--avoid_patterns", dest="avoid_patterns", help="DNA sequence patterns to avoid, listed as a comma separated list (no spaces!)")
+optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="The names of the enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII")
+optimizer_parser.add_argument("--species", "-s", dest="species", default="e_coli", help="specifies the codon bias table to use as a comma separated list. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
+#parser.add_argument("--codon_bias_table", dest="codon_bias_table_filename", help="overrides species, gives a custom codon bias table. See <NEED EXAMPLE> for example of formatting")
+optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to %(default)s", default=False, action="store_true")
+optimizer_parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", action="store_true", default=True, help="homopolymers can complicate synthesis. We minimize them by default, but you can turn this off")
+optimizer_parser.add_argument("--avoid_hairpints", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
+optimizer_parser.add_argument("--optimize_terminal_GC_content", action="store_true", default=True, help="TODO: need to implement this AND write a helpful help")
+optimizer_parser.add_argument("--constrain_CAI", dest="CAI_lower_bound", type=float, default=0.8, help="TODO: fill out help") ##UNCLEAR if this actually helps since CodonOptimize is this exact thing
 #some argument for avoiding other kmer repeats?
 #some argument for avoiding homopolymer?
 
-#Output Arguments
-parser.add_argument("--output_mode", dest="output_mode", default="print", help="supported output modes: print (to terminal) (default), fasta, or genbank. If no output_filename is supplied but a non-print option is selected, it'll just use the name of the input (from the fasta file) or \"gblock###\" if none specified.")
-parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="gblocks")
+#NOTE: using action="store_true" and default=True makes no sense. This is not an option
 
+output_parser = parser.add_argument_group(title="Output Options", description=None)
+#Output Arguments
+output_parser.add_argument("--output_mode", dest="output_mode", default="print", help="supported output modes: print (to terminal) (default), fasta, or genbank. If no output_filename is supplied but a non-print option is selected, it'll just use the name of the input (from the fasta file) or \"domesticator_optimization\" if none specified.")
+output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
 args = parser.parse_args()
+
+records_to_optimize = []
+if args.input_mode == "protein_fasta_file":
+	for input_filename in args.input:
+		for record in SeqIO.parse(input_filename, 'fasta'):
+			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+			records_to_optimize.append(record)
+elif args.input_mode == "DNA_fasta_file":
+	for input_filename in args.input:
+		for record in SeqIO.parse(input_filename, 'fasta'):
+			assert(len(record.seq) % 3 == 0)
+			record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
+			#record.seq.alphabet = IUPAC.unambiguous_dna
+			print(record)
+
+			
+
+
+
+
+
+for record in records_to_optimize:
+	
+
+
+
+
+	if args.vector:
+		vector_reader(args.vector, seq, args.destination)
+
+	constraints = []
+	objectives = []
+	#if a vector is provided, read it in, parse out the vector/cloning scheme-specific constraints, and insert initial sequence
+
+
+
+
+
+
+
+
+
+
+
+exit()
+
+
+
+
 
 
 
@@ -116,8 +257,8 @@ args = parser.parse_args()
 
 
 #Handle Argument Requirements
-if args.primers_only is True and (args.protein_sequence or args.protein_fasta):
-	sys.exit("Error: can't create primers with protein sequences")
+#if args.primers_only is True and (args.protein_sequence or args.protein_fasta):
+#	sys.exit("Error: can't create primers with protein sequences")
 num_of_required_set = sum(((args.dna_sequence is not None), (args.protein_sequence is not None), (args.protein_fasta is not None), (args.dna_fasta is not None)))
 if num_of_required_set == 0:
 	sys.exit("I know \"required options\" are kind of dumb, but I use them so deal with it. I suppose I should implement this as a group."
@@ -126,8 +267,7 @@ if num_of_required_set == 0:
 if num_of_required_set >1:
 	sys.exit("Only one of the following may be supplied:  --dna_sequence, --protein_sequence, --dna_fasta, or --protein_fasta. "
 		 "You supplied %d. See --help for more information" % num_of_required_set)
-if args.cloning_path:
-	sys.exit("custom cloning schemes are not yet supported")
+
 
 if args.protein_sequence or args.protein_fasta:
 	args.is_cds = True
@@ -169,27 +309,29 @@ for sr in SeqRecords:
 
 
 
+#note, since we're chainging from stupid json cloning schemes to genbank, make use of DnaChisel's
+#built in find_specification_in_feature function under biotools. 
+
+
 #load cloning scheme
 cloning_file = ""
-if args.cloning_path is not None:
-	cloning_file = args.cloning_path
-elif args.scheme is not None:
+if args.scheme:
 	cloning_file = database + "cloning_schema/" + args.scheme + ".json"
 if cloning_file is not "":
 	print("loading cloning scheme")
 	with open(cloning_file) as clone_json:
 		scheme = json.load(clone_json)
 		print("scheme loaded from " + cloning_file)
-		if scheme['type_required'] and args.type is None:
-			print("parts type required for cloning scheme %s" % cloning_file)
-			print("options are: %s" % scheme['parts'])
-			exit()
-		part_type = scheme['parts'][args.type]
-		left_flank = part_type["left_flank"]
-		right_flank = part_type["right_flank"]
+		#if scheme['type_required'] and args.type is None:
+		#	print("parts type required for cloning scheme %s" % cloning_file)
+		#	print("options are: %s" % scheme['parts'])
+		#	exit()
+		#part_type = scheme['parts'][args.type]
+		#left_flank = part_type["left_flank"]
+		#right_flank = part_type["right_flank"]
 		#override flanks if requested
-		if args.right_flank: right_flank = args.right_flank
-		if args.left_flank: left_flank = args.left_flank
+		#if args.right_flank: right_flank = args.right_flank
+		#if args.left_flank: left_flank = args.left_flank
 
 		patterns_to_avoid = scheme['patterns_to_avoid'] + [enzyme_pattern(enzyme) for enzyme in scheme['enzymes_to_avoid']]
 		#for pattern in scheme['patterns_to_avoid']:
@@ -204,15 +346,17 @@ if cloning_file is not "":
 			#NOTE: try using "SHIFT" in the SeqFeature class
 			#apply flanking sequences, keeping track of CDS and shifting location as necessary
 #			print(sr.seq)
-			sr.seq = left_flank + sr.seq + right_flank
+			#sr.seq = left_flank + sr.seq + right_flank
 			for f in sr.features:
 				if f.type == "CDS":
-					f.location = f.location + len(left_flank)
+					#f.location = f.location + len(left_flank)
+					f.location = f.location
 
 		#need to tell the optimizer it's not allowed to touch the flanks
 		#This is probably not the best way to do it but it's what I got. 
-		local_constraints = [[AvoidChanges(Location(0,len(left_flank))), AvoidChanges(Location(len(sr.seq) - len(right_flank),len(sr.seq)))] + [AvoidPattern(pattern=pattern,location=Location(len(left_flank),len(sr.seq) - len(right_flank))) for pattern in patterns_to_avoid] for sr in SeqRecords]
-		
+		#local_constraints = [[AvoidChanges(Location(0,len(left_flank))), AvoidChanges(Location(len(sr.seq) - len(right_flank),len(sr.seq)))] + [AvoidPattern(pattern=pattern,location=Location(len(left_flank),len(sr.seq) - len(right_flank))) for pattern in patterns_to_avoid] for sr in SeqRecords]
+		local_constraints = [[AvoidPattern(pattern=pattern,location=Location(len(left_flank),len(sr.seq) - len(right_flank))) for pattern in patterns_to_avoid] for sr in SeqRecords]
+
 		####MUST DO add EnforceTranslation(location=Location(len(left_flank),len(sr.seq) - len(right_flank))) which works with the type, if it is a type that gets translated. Shit
 
 
@@ -237,6 +381,8 @@ global_constraints += [
                 EnforceGCContent(0.4,0.65), #global
                 EnforceGCContent(0.25,0.8,window=50)] #local
 
+
+
 if args.avoid_restriction_sites:
 	print("avoiding:")
 	for enzy in args.avoid_restriction_sites.split(","):
@@ -251,11 +397,14 @@ if args.is_cds:
 	print("optimizing for:")
 	for species in args.species.split(","):
 		print(species)
+		if args.CAI_lower_bound > 0.0:
+			global_constraints.append(constraints.ConstrainCAI(species=species, minimum=args.CAI_lower_bound))
 		if args.harmonized:
 			global_objectives.append(CodonOptimize(species,mode='harmonized')) #NEEDS LOCATION WITH CDS
 		else:
 			global_objectives.append(CodonOptimize(species,mode='best_codon')) #NEEDS LOCATION WITH CDS
 	#global_objectives.append(CodonOptimize(species=args.species,mode='best_codon')) #NEEDS LOCATION WITH CDS
+
 print("begin optimization")
 #start optimization
 
