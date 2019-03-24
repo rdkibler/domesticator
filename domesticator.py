@@ -45,6 +45,7 @@ from Bio.SeqFeature import *
 from Bio.Seq import (MutableSeq, Seq)
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
+from Bio.PDB import PDBParser, PPBuilder
 import constraints
 import objectives
 import os
@@ -115,17 +116,14 @@ import os
 
 
 
-def vector_reader(filename, insert_seq, destination_label):
+def load_template(filename):
 	''' func descriptor '''
 
-	print("vector_reader")
-	print(filename)
-	for x in SeqIO.parse(filename, "genbank"):
-		print(x)
-		print([feat.qualifiers['label'] for feat in x.features if feat.type[:3] == 'dom_destination'])
-		print(x.annotations)
+	vector = SeqIO.read(filename, "genbank")
+	feats = [feat.qualifiers for feat in vector.features]
+	keywords = {kw.strip("\"").split(":")[0] : kw.strip("\"").split(":")[1:] for kw in vector.annotations['keywords'][0].split(' ')}
 
-	exit()
+	#prevent everything except destination from changing
 
 	#Need to fined the dom_destination feature type which has the same label as destination_label
 	#scream loudly if this wasn't found.
@@ -140,7 +138,74 @@ def vector_reader(filename, insert_seq, destination_label):
 
 
 	#This seq should be a SeqRecord object
-	return seq, constraints, objectives
+	return vector
+
+
+
+def replace_sequence_in_record(record, location, new_seq):
+	#print(record, location, new_seq)
+	insert = new_seq.seq
+	if location.strand == 1:
+
+		#print(dir(location))
+		#print(location.extract(record.seq))
+		#print(record.seq[location.start:location.end])
+		adjusted_seq = record.seq[:location.start] + new_seq.seq + record.seq[location.end:]
+		#exit(adjusted_seq)
+		record.seq = adjusted_seq
+
+		#print(help(location))
+		#exit(dir(location))
+
+		seq_diff = len(new_seq) - len(location)
+
+		#adjust all features
+		for feat in record.features:
+			loc = feat.location
+			
+			earliest = min(loc.start, loc.end)
+			latest = max(loc.start, loc.end)
+
+			##gonna have to be careful about this
+
+			if earliest > location.end and :
+				feat.location += seq_diff
+
+			if feat.location.start in location or feat.location.end in location:
+				#they're overlapping
+				#will have to create a whole new feature. Can't just modify this one unfortunately. 
+				exit('unimplemented')
+
+		return record
+
+	else:
+		exit("not implemented")
+
+
+def insert_into_vector(vector, destination, new_seq):
+	destination_annotation = None
+	for feat in vector.features:
+		if feat.qualifiers['label'][0] == destination:
+			destination_annotation = feat
+
+			#I will be replacing it so remove it:
+			vector.features.remove(feat)
+			break
+	if not destination_annotation:
+		exit("destination not found: " + destination)
+	#print(destination_annotation)
+
+	location = destination_annotation.location
+
+	#print(vector)
+	#print(vector.features)
+	#print(dir(vector.features))
+	vector = replace_sequence_in_record(vector, location, new_seq)
+
+
+	#put in a new feature for this thing:
+	#exit("not implemented")
+	return vector
 
 
 
@@ -162,7 +227,7 @@ parser.add_argument('--version', action='version', version='%(prog)s 0.2')
 input_parser = parser.add_argument_group(title="Input Options", description=None)
 input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Types are automatically determined. If this fails, set --input_mode to the input type.")
 input_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="HELP MESSAGE")
-input_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
+input_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT1", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
 input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_fasta_file", 	help="Input mode. Protein fasta file by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
 
 #Cloning Arguments
@@ -186,7 +251,7 @@ optimizer_parser.add_argument("--species", "-s", dest="species", default="e_coli
 #parser.add_argument("--codon_bias_table", dest="codon_bias_table_filename", help="overrides species, gives a custom codon bias table. See <NEED EXAMPLE> for example of formatting")
 optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to %(default)s", default=False, action="store_true")
 optimizer_parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", action="store_true", default=True, help="homopolymers can complicate synthesis. We minimize them by default, but you can turn this off")
-optimizer_parser.add_argument("--avoid_hairpints", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
+optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
 optimizer_parser.add_argument("--optimize_terminal_GC_content", action="store_true", default=True, help="TODO: need to implement this AND write a helpful help")
 optimizer_parser.add_argument("--constrain_CAI", dest="CAI_lower_bound", type=float, default=0.8, help="TODO: fill out help") ##UNCLEAR if this actually helps since CodonOptimize is this exact thing
 #some argument for avoiding other kmer repeats?
@@ -201,34 +266,64 @@ output_parser.add_argument("--output_filename", dest="output_filename", help="de
 
 args = parser.parse_args()
 
-records_to_optimize = []
+rec_counter = 1
+inserts_to_optimize = []
 if args.input_mode == "protein_fasta_file":
 	for input_filename in args.input:
 		for record in SeqIO.parse(input_filename, 'fasta'):
 			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-			records_to_optimize.append(record)
+			inserts_to_optimize.append(record)
 elif args.input_mode == "DNA_fasta_file":
 	for input_filename in args.input:
 		for record in SeqIO.parse(input_filename, 'fasta'):
 			assert(len(record.seq) % 3 == 0)
 			record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
-			#record.seq.alphabet = IUPAC.unambiguous_dna
-			print(record)
+			inserts_to_optimize.append(record)
+elif args.input_mode == "protein_sequnce":
+	for input_sequence in args.input:
+		record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+		rec_counter += 1
+		inserts_to_optimize.append(record)
 
-			
+elif args.input_mode == "DNA_sequence":
+	for input_sequence in args.input:
+		record = SeqRecord(Seq(input_sequence,IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+		rec_counter += 1
+		inserts_to_optimize.append(record)
 
-
-
-
-
-for record in records_to_optimize:
+elif args.input_mode == "PDB":
+	chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	parser = PDBParser()
+	ppb=PPBuilder()
+	for input_pdb in args.input:
+		for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
+			seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
+			name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
+			record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
+			inserts_to_optimize.append(record)
+else:
+	exit("input mode not recognized: " + args.input_mode)
 	
+if args.vector:
+	vector = load_template(args.vector)	
+else:
+	vector = SeqRecord()
+	#empty vector
+
+#now load all the custom global constraints and objectives?
+
+
+for insert in inserts_to_optimize:
+	vector = insert_into_vector(vector, args.destination, insert)
+	print(vector)
+	SeqIO.write([vector], "output.gb", "genbank")
+	print("done")
+
+	exit()
 
 
 
 
-	if args.vector:
-		vector_reader(args.vector, seq, args.destination)
 
 	constraints = []
 	objectives = []
