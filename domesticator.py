@@ -121,7 +121,11 @@ def load_template(filename):
 
 	vector = SeqIO.read(filename, "genbank")
 	feats = [feat.qualifiers for feat in vector.features]
-	keywords = {kw.strip("\"").split(":")[0] : kw.strip("\"").split(":")[1:] for kw in vector.annotations['keywords'][0].split(' ')}
+	#beware, the keywords tag may not exist
+	#keywords = {kw.strip("\"").split(":")[0] : kw.strip("\"").split(":")[1:] for kw in vector.annotations['keywords'][0].split(' ')}
+
+
+
 
 	#prevent everything except destination from changing
 
@@ -158,24 +162,140 @@ def replace_sequence_in_record(record, location, new_seq):
 		#exit(dir(location))
 
 		seq_diff = len(new_seq) - len(location)
+		orig_start = location.start
+		orig_end = location.end
+
+		processed_features = []
+
+		print("-=-=-=-=-=-=-=-=-=-==---=-=-=-=-=-=")
+		print(location)
+		print("diff: %d" % seq_diff)
 
 		#adjust all features
 		for feat in record.features:
-			loc = feat.location
+			print("----------------------------------------")
+			print(feat.qualifiers['label'][0])
+			print(feat.location)
+
+			f_loc = feat.location
+
 			
-			earliest = min(loc.start, loc.end)
-			latest = max(loc.start, loc.end)
 
-			##gonna have to be careful about this
+			assert(f_loc.start <= f_loc.end)
+			
+			#type 1: where the start and end are contained within the original location
+			#-> do not add it to the processed_features list
+			if f_loc.start >= location.start and f_loc.start <= location.end and f_loc.end >= location.start and f_loc.end <= location.end:
+				print("start: %d and end: %d are contained within %s" % (f_loc.start, f_loc.end, location))
+				print("omit")
+				continue
 
-			if earliest > location.end and :
+
+			#type 2: where they start or end inside the location
+			#-> chop off. don't forget to add on approprate amount
+			##THINK! does strand even matter? How is start and end defined? I'm assuming that for strand -1 things are flipped but that's probably not how it's implemented. Also, consider strand = 0 (no direction). There is probably an easier way. 
+			elif f_loc.start >= location.start and f_loc.start <= location.end:
+				print("start: %d is in %s" % (f_loc.start, location))
+				new_loc = FeatureLocation(location.end + seq_diff, f_loc.end + seq_diff, strand=f_loc.strand)
+				feat.location = new_loc
+				print("new loc:")
+				print(new_loc)
+				processed_features.append(feat)
+			elif f_loc.end >= location.start and f_loc.end <= location.end:
+				print("end: %d is in %s" % (f_loc.start, location))
+				new_loc = FeatureLocation(f_loc.start, location.start, strand=f_loc.strand)
+				feat.location = new_loc
+				print("new loc:")
+				print(new_loc)
+				processed_features.append(feat)
+
+			# elif f_loc.start in location:
+			# 	if location.strand == 1:
+			# 		if f_loc.strand == 1:
+			# 			#LOCATION	S----E
+			# 			#F_LOC 		   S----E
+			# 			new_loc = FeatureLocation(location.end + seq_diff, f_loc.end + seq_diff, strand=f_loc.strand)
+			# 		else:
+			# 			#LOCATION	   S----E
+			# 			#F_LOC 		E----S
+			# 			new_loc = FeatureLocation(location.start, f_loc.end, strand=f_loc.strand)
+			# 	else:
+			# 		if f_loc.strand == 1:
+			# 			#LOCATION	E----S
+			# 			#F_LOC 		   S----E
+			# 			new_loc = FeatureLocation(location.start + seq_diff, f_loc.end + seq_diff, strand=f_loc.strand)
+			# 		else:
+			# 			#LOCATION	   E----S
+			# 			#F_LOC 		E----S
+			# 			new_loc = FeatureLocation(location.end, f_loc.end, strand=f_loc.strand)
+			# 	feat.location = new_loc
+			# 	processed_features.append(feat)
+			# elif f_loc.end in location:
+			# 	if location.strand == 1:
+			# 		if f_loc.strand == 1:
+			# 			#LOCATION	   S----E
+			# 			#F_LOC 		S----E
+			# 			new_loc = FeatureLocation(f_loc.start, location.start, strand=f_loc.strand)
+			# 		else:
+			# 			#LOCATION	S----E
+			# 			#F_LOC 		   E----S
+			# 			new_loc = FeatureLocation(f_loc.start + seq_diff, location.end + seq_diff, strand=f_loc.strand)
+			# 	else:
+			# 		if f_loc.strand == 1:
+			# 			#LOCATION	   E----S
+			# 			#F_LOC 		S----E
+			# 			new_loc = FeatureLocation(f_loc.start, location.end, strand=f_loc.strand)
+			# 		else:
+			# 			#LOCATION	E----S
+			# 			#F_LOC 		   E----S
+			# 			new_loc = FeatureLocation(f_loc.start + seq_diff, location.start + seq_diff, strand=f_loc.strand)
+			# 	feat.location = new_loc
+			# 	processed_features.append(feat)
+
+			#type 3: where they span the location 
+			#-> keep the leftmost point same and add diff to rightmost. do not split
+			elif location.start >= f_loc.start and location.start <= f_loc.end and location.end >= f_loc.start and location.end <= f_loc.end:
+				print("loc spans insert. keep start and add diff to end")
+				new_loc = FeatureLocation(f_loc.start, f_loc.end + seq_diff, strand=f_loc.strand)
+				feat.location = new_loc
+				print("new loc:")
+				print(new_loc)
+				processed_features.append(feat)
+			# elif location.start in f_loc and location.end in f_loc:
+			# 	if f_loc.strand == 1:
+			# 		#LOCATION	   S-E
+			# 		#F_LOC 		S-------E
+			# 		new_loc = FeatureLocation(f_loc.start, f_loc.end + seq_diff, strand=f_loc.strand)#
+			# 	else:
+			# 		#LOCATION	   S-E
+			# 		#F_LOC 		E-------S
+			# 		new_loc = FeatureLocation(f_loc.start + seq_diff, f_loc.end, strand=f_loc.strand)
+
+
+
+			#type 4: where they start and end before location
+			#-> add it to list unchanged
+			elif f_loc.start <= location.start and f_loc.end <= location.start:
+				print("loc is before insert location so just keep")
+
+				processed_features.append(feat)
+
+			#type 5: where they start and end after location
+			#-> add diff to whole location
+			elif f_loc.start >= location.end and f_loc.end >= location.end:
+				print("loc is after insert location so apply offset and keep")
 				feat.location += seq_diff
+				print("new loc:")
+				print(feat.location)
+				processed_features.append(feat)
 
-			if feat.location.start in location or feat.location.end in location:
-				#they're overlapping
-				#will have to create a whole new feature. Can't just modify this one unfortunately. 
-				exit('unimplemented')
+		record.features = processed_features
 
+
+
+
+
+		#ok. getting close. Two problems persist. Annotations don't wrap properly it appears (see clean stop in result vs jagged stop in correct) and vector and x get combined through the insert. Definitely not desired
 		return record
 
 	else:
@@ -307,16 +427,17 @@ else:
 if args.vector:
 	vector = load_template(args.vector)	
 else:
-	vector = SeqRecord()
+	vector = SeqRecord("")
 	#empty vector
 
 #now load all the custom global constraints and objectives?
 
 
 for insert in inserts_to_optimize:
+	print(vector)
 	vector = insert_into_vector(vector, args.destination, insert)
 	print(vector)
-	SeqIO.write([vector], "output.gb", "genbank")
+	SeqIO.write([vector], "result.gb", "genbank")
 	print("done")
 
 	exit()
