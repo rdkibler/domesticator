@@ -148,158 +148,93 @@ def load_template(filename):
 
 def replace_sequence_in_record(record, location, new_seq):
 	#print(record, location, new_seq)
-	insert = new_seq.seq
-	if location.strand == 1:
+	#print(dir(location))
+	#print(location.extract(record.seq))
+	#print(record.seq[location.start:location.end])
+	adjusted_seq = record.seq[:location.start] + new_seq.seq + record.seq[location.end:]
+	#exit(adjusted_seq)
+	record.seq = adjusted_seq
 
-		#print(dir(location))
-		#print(location.extract(record.seq))
-		#print(record.seq[location.start:location.end])
-		adjusted_seq = record.seq[:location.start] + new_seq.seq + record.seq[location.end:]
-		#exit(adjusted_seq)
-		record.seq = adjusted_seq
+	#print(help(location))
+	#exit(dir(location))
 
-		#print(help(location))
-		#exit(dir(location))
+	seq_diff = len(new_seq) - len(location)
+	orig_start = location.start
+	orig_end = location.end
 
-		seq_diff = len(new_seq) - len(location)
-		orig_start = location.start
-		orig_end = location.end
+	processed_features = []
 
-		processed_features = []
+	#print("-=-=-=-=-=-=-=-=-=-==---=-=-=-=-=-=")
+	#print(location)
+	#print("diff: %d" % seq_diff)
 
-		print("-=-=-=-=-=-=-=-=-=-==---=-=-=-=-=-=")
-		print(location)
-		print("diff: %d" % seq_diff)
+	#adjust all features
+	for feat in record.features:
+		#print("----------------------------------------")
+		#print(feat.qualifiers['label'][0])
+		#print(feat.location)
 
-		#adjust all features
-		for feat in record.features:
-			print("----------------------------------------")
-			print(feat.qualifiers['label'][0])
-			print(feat.location)
+		f_loc = feat.location
 
-			f_loc = feat.location
+		loc_list = []
 
-			
+		for subloc in f_loc.parts:
 
-			assert(f_loc.start <= f_loc.end)
+			assert(subloc.start <= subloc.end)
 			
 			#type 1: where the start and end are contained within the original location
 			#-> do not add it to the processed_features list
-			if f_loc.start >= location.start and f_loc.start <= location.end and f_loc.end >= location.start and f_loc.end <= location.end:
-				print("start: %d and end: %d are contained within %s" % (f_loc.start, f_loc.end, location))
-				print("omit")
+			if subloc.start >= location.start and subloc.start <= location.end and subloc.end >= location.start and subloc.end <= location.end:
+				#print("start: %d and end: %d are contained within %s" % (subloc.start, subloc.end, location))
+				#print("omit")
 				continue
 
 
 			#type 2: where they start or end inside the location
 			#-> chop off. don't forget to add on approprate amount
 			##THINK! does strand even matter? How is start and end defined? I'm assuming that for strand -1 things are flipped but that's probably not how it's implemented. Also, consider strand = 0 (no direction). There is probably an easier way. 
-			elif f_loc.start >= location.start and f_loc.start <= location.end:
-				print("start: %d is in %s" % (f_loc.start, location))
-				new_loc = FeatureLocation(location.end + seq_diff, f_loc.end + seq_diff, strand=f_loc.strand)
-				feat.location = new_loc
-				print("new loc:")
-				print(new_loc)
-				processed_features.append(feat)
-			elif f_loc.end >= location.start and f_loc.end <= location.end:
-				print("end: %d is in %s" % (f_loc.start, location))
-				new_loc = FeatureLocation(f_loc.start, location.start, strand=f_loc.strand)
-				feat.location = new_loc
-				print("new loc:")
-				print(new_loc)
-				processed_features.append(feat)
+			elif subloc.start >= location.start and subloc.start <= location.end:
+				#print("start: %d is in %s" % (subloc.start, location))
+				new_loc = FeatureLocation(location.end + seq_diff, subloc.end + seq_diff, strand=subloc.strand)
 
-			# elif f_loc.start in location:
-			# 	if location.strand == 1:
-			# 		if f_loc.strand == 1:
-			# 			#LOCATION	S----E
-			# 			#F_LOC 		   S----E
-			# 			new_loc = FeatureLocation(location.end + seq_diff, f_loc.end + seq_diff, strand=f_loc.strand)
-			# 		else:
-			# 			#LOCATION	   S----E
-			# 			#F_LOC 		E----S
-			# 			new_loc = FeatureLocation(location.start, f_loc.end, strand=f_loc.strand)
-			# 	else:
-			# 		if f_loc.strand == 1:
-			# 			#LOCATION	E----S
-			# 			#F_LOC 		   S----E
-			# 			new_loc = FeatureLocation(location.start + seq_diff, f_loc.end + seq_diff, strand=f_loc.strand)
-			# 		else:
-			# 			#LOCATION	   E----S
-			# 			#F_LOC 		E----S
-			# 			new_loc = FeatureLocation(location.end, f_loc.end, strand=f_loc.strand)
-			# 	feat.location = new_loc
-			# 	processed_features.append(feat)
-			# elif f_loc.end in location:
-			# 	if location.strand == 1:
-			# 		if f_loc.strand == 1:
-			# 			#LOCATION	   S----E
-			# 			#F_LOC 		S----E
-			# 			new_loc = FeatureLocation(f_loc.start, location.start, strand=f_loc.strand)
-			# 		else:
-			# 			#LOCATION	S----E
-			# 			#F_LOC 		   E----S
-			# 			new_loc = FeatureLocation(f_loc.start + seq_diff, location.end + seq_diff, strand=f_loc.strand)
-			# 	else:
-			# 		if f_loc.strand == 1:
-			# 			#LOCATION	   E----S
-			# 			#F_LOC 		S----E
-			# 			new_loc = FeatureLocation(f_loc.start, location.end, strand=f_loc.strand)
-			# 		else:
-			# 			#LOCATION	E----S
-			# 			#F_LOC 		   E----S
-			# 			new_loc = FeatureLocation(f_loc.start + seq_diff, location.start + seq_diff, strand=f_loc.strand)
-			# 	feat.location = new_loc
-			# 	processed_features.append(feat)
+			elif subloc.end >= location.start and subloc.end <= location.end:
+				#print("end: %d is in %s" % (subloc.end, location))
+				new_loc = FeatureLocation(subloc.start, location.start, strand=subloc.strand)
+				
 
 			#type 3: where they span the location 
 			#-> keep the leftmost point same and add diff to rightmost. do not split
-			elif location.start >= f_loc.start and location.start <= f_loc.end and location.end >= f_loc.start and location.end <= f_loc.end:
-				print("loc spans insert. keep start and add diff to end")
-				new_loc = FeatureLocation(f_loc.start, f_loc.end + seq_diff, strand=f_loc.strand)
-				feat.location = new_loc
-				print("new loc:")
-				print(new_loc)
-				processed_features.append(feat)
-			# elif location.start in f_loc and location.end in f_loc:
-			# 	if f_loc.strand == 1:
-			# 		#LOCATION	   S-E
-			# 		#F_LOC 		S-------E
-			# 		new_loc = FeatureLocation(f_loc.start, f_loc.end + seq_diff, strand=f_loc.strand)#
-			# 	else:
-			# 		#LOCATION	   S-E
-			# 		#F_LOC 		E-------S
-			# 		new_loc = FeatureLocation(f_loc.start + seq_diff, f_loc.end, strand=f_loc.strand)
-
-
+			elif location.start >= subloc.start and location.start <= subloc.end and location.end >= subloc.start and location.end <= subloc.end:
+				#print("loc spans insert. keep start and add diff to end")
+				new_loc = FeatureLocation(subloc.start, subloc.end + seq_diff, strand=subloc.strand)
 
 			#type 4: where they start and end before location
 			#-> add it to list unchanged
-			elif f_loc.start <= location.start and f_loc.end <= location.start:
-				print("loc is before insert location so just keep")
-
-				processed_features.append(feat)
+			elif subloc.start <= location.start and subloc.end <= location.start:
+				#print("loc is before insert location so just keep")
+				new_loc = subloc
 
 			#type 5: where they start and end after location
 			#-> add diff to whole location
-			elif f_loc.start >= location.end and f_loc.end >= location.end:
-				print("loc is after insert location so apply offset and keep")
-				feat.location += seq_diff
-				print("new loc:")
-				print(feat.location)
-				processed_features.append(feat)
+			elif subloc.start >= location.end and subloc.end >= location.end:
+				#print("loc is after insert location so apply offset and keep")
+				new_loc = subloc + seq_diff
 
-		record.features = processed_features
+			loc_list.append(new_loc)
+			#print("new loc:")
+			#print(new_loc)
+		
+		#if the list is empty, it means that all the sublocs were contained within the insert
+		if loc_list:
+			feat.location = sum(loc_list)
+			processed_features.append(feat)
 
 
+	record.features = processed_features
 
 
+	return record
 
-		#ok. getting close. Two problems persist. Annotations don't wrap properly it appears (see clean stop in result vs jagged stop in correct) and vector and x get combined through the insert. Definitely not desired
-		return record
-
-	else:
-		exit("not implemented")
 
 
 def insert_into_vector(vector, destination, new_seq):
@@ -332,113 +267,151 @@ def insert_into_vector(vector, destination, new_seq):
 def vector_writer():
 	pass
 
+#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
 
-parser=argparse.ArgumentParser(prog='domesticator', description='TODO: write description')
 
-parser.add_argument('--version', action='version', version='%(prog)s 0.2')
+if __name__ == "__main__":
 
-#Input Arguments
-#parser.add_argument("--dna_sequence","-d",dest="dna_sequence",help="DNA sequence you want to optimize. Required and mutaually exclusive with --protein_sequence, --dna_fasta, and --protein_fasta.")
-#parser.add_argument("--protein_sequence","-p",dest="protein_sequence",help="protein sequence you want to back translate and optimize. Required and mutually exclusive with --dna_sequence, dna_fasta, and protein_fasta")
-#parser.add_argument("--dna_fasta","-D",dest="dna_fasta",help="fasta file containing dna sequences you want to optimize")
-#parser.add_argument("--protein_fasta","-P",dest="protein_fasta",help="fasta file containing protein sequences you want to back translate and optimize")
-#parser.add_argument("--sequence_name", "-n",dest="name",help="Use with --dna_sequence or --protein_sequence. Specify the name to be associated with the inputted sequence. default to %(default)s", default="gblock")
-#parser.add_argument("--cds",dest="is_cds",action="store_true",default=True, help="I assume that any DNA sequence given to me is a CoDing Sequence (CDS) unless specified")
-input_parser = parser.add_argument_group(title="Input Options", description=None)
-input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Types are automatically determined. If this fails, set --input_mode to the input type.")
-input_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="HELP MESSAGE")
-input_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT1", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
-input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_fasta_file", 	help="Input mode. Protein fasta file by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
+	parser=argparse.ArgumentParser(prog='domesticator', description='The coolest codon optimizer on the block')
 
-#Cloning Arguments
-#parser.add_argument("--cloning_scheme", "-c", dest="scheme", help="Specifies the overhang type and the specific patterns/restriction sites to avoid. Do not set flag if you don\'t want to apply a cloning scheme. Options are: \'MoClo-YTK\', [more coming soon] TODO: pet29_for_idt")
-#parser.add_argument("--custom_cloning", dest="cloning_path",help="supply specifications for a custom cloning scheme")
-#parser.add_argument("--part_type", "-t",dest="type",help="The type to domesticate the input sequence as according to the cloning_scheme selected")
-#parser.add_argument("--right_flank",dest="right_flank", help="overrides the selected cloning scheme\'s 3\' flank")
-#parser.add_argument("--left_flank",dest="left_flank", help="overrides the selected cloning scheme\'s 5\' flank")
-#parser.add_argument("--primers_only",dest="primers_only", action="store_true",default=False,help="overrides all sequence optimization, outputs primers that will convert an existing sequence into a usable part. Incompatible with --protein_sequence and --protien_fasta")
-#parser.add_argument("--conversion_primers",dest="types", help="report primers that can be used to convert the designed part into other parts, specified as a comma-separated list")
-#parser.add_argument("--max_primer_len",dest="primer_len", type=int,default=60,help="use with --primers_only flag. default is %(default)dC")
-#parser.add_argument("--primer_min_tm",dest="primer_min_tm", type=float,default=58.0,help="TODO:implement")
+	parser.add_argument('--version', action='version', version='%(prog)s 0.2')
 
-optimizer_parser = parser.add_argument_group(title="Optimizer Options", description=None)
-#Optimization Arguments
-optimizer_parser.add_argument("--avoid_kmers", type=int, dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
-optimizer_parser.add_argument("--avoid_kmers_boost", type=float, dest="kmer_boost", default=10.0, help="TODO: fill out this help. Default to %(default)s")
-optimizer_parser.add_argument("--avoid_patterns", dest="avoid_patterns", help="DNA sequence patterns to avoid, listed as a comma separated list (no spaces!)")
-optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="The names of the enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII")
-optimizer_parser.add_argument("--species", "-s", dest="species", default="e_coli", help="specifies the codon bias table to use as a comma separated list. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
-#parser.add_argument("--codon_bias_table", dest="codon_bias_table_filename", help="overrides species, gives a custom codon bias table. See <NEED EXAMPLE> for example of formatting")
-optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to %(default)s", default=False, action="store_true")
-optimizer_parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", action="store_true", default=True, help="homopolymers can complicate synthesis. We minimize them by default, but you can turn this off")
-optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
-optimizer_parser.add_argument("--optimize_terminal_GC_content", action="store_true", default=True, help="TODO: need to implement this AND write a helpful help")
-optimizer_parser.add_argument("--constrain_CAI", dest="CAI_lower_bound", type=float, default=0.8, help="TODO: fill out help") ##UNCLEAR if this actually helps since CodonOptimize is this exact thing
-#some argument for avoiding other kmer repeats?
-#some argument for avoiding homopolymer?
+	#Input Arguments
+	#parser.add_argument("--dna_sequence","-d",dest="dna_sequence",help="DNA sequence you want to optimize. Required and mutaually exclusive with --protein_sequence, --dna_fasta, and --protein_fasta.")
+	#parser.add_argument("--protein_sequence","-p",dest="protein_sequence",help="protein sequence you want to back translate and optimize. Required and mutually exclusive with --dna_sequence, dna_fasta, and protein_fasta")
+	#parser.add_argument("--dna_fasta","-D",dest="dna_fasta",help="fasta file containing dna sequences you want to optimize")
+	#parser.add_argument("--protein_fasta","-P",dest="protein_fasta",help="fasta file containing protein sequences you want to back translate and optimize")
+	#parser.add_argument("--sequence_name", "-n",dest="name",help="Use with --dna_sequence or --protein_sequence. Specify the name to be associated with the inputted sequence. default to %(default)s", default="gblock")
+	#parser.add_argument("--cds",dest="is_cds",action="store_true",default=True, help="I assume that any DNA sequence given to me is a CoDing Sequence (CDS) unless specified")
+	input_parser = parser.add_argument_group(title="Input Options", description=None)
+	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Types are automatically determined. If this fails, set --input_mode to the input type.")
+	input_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="HELP MESSAGE")
+	input_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT1", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
+	input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_fasta_file", 	help="Input mode. Protein fasta file by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
 
-#NOTE: using action="store_true" and default=True makes no sense. This is not an option
+	#Cloning Arguments
+	#parser.add_argument("--cloning_scheme", "-c", dest="scheme", help="Specifies the overhang type and the specific patterns/restriction sites to avoid. Do not set flag if you don\'t want to apply a cloning scheme. Options are: \'MoClo-YTK\', [more coming soon] TODO: pet29_for_idt")
+	#parser.add_argument("--custom_cloning", dest="cloning_path",help="supply specifications for a custom cloning scheme")
+	#parser.add_argument("--part_type", "-t",dest="type",help="The type to domesticate the input sequence as according to the cloning_scheme selected")
+	#parser.add_argument("--right_flank",dest="right_flank", help="overrides the selected cloning scheme\'s 3\' flank")
+	#parser.add_argument("--left_flank",dest="left_flank", help="overrides the selected cloning scheme\'s 5\' flank")
+	#parser.add_argument("--primers_only",dest="primers_only", action="store_true",default=False,help="overrides all sequence optimization, outputs primers that will convert an existing sequence into a usable part. Incompatible with --protein_sequence and --protien_fasta")
+	#parser.add_argument("--conversion_primers",dest="types", help="report primers that can be used to convert the designed part into other parts, specified as a comma-separated list")
+	#parser.add_argument("--max_primer_len",dest="primer_len", type=int,default=60,help="use with --primers_only flag. default is %(default)dC")
+	#parser.add_argument("--primer_min_tm",dest="primer_min_tm", type=float,default=58.0,help="TODO:implement")
 
-output_parser = parser.add_argument_group(title="Output Options", description=None)
-#Output Arguments
-output_parser.add_argument("--output_mode", dest="output_mode", default="print", help="supported output modes: print (to terminal) (default), fasta, or genbank. If no output_filename is supplied but a non-print option is selected, it'll just use the name of the input (from the fasta file) or \"domesticator_optimization\" if none specified.")
-output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
+	optimizer_parser = parser.add_argument_group(title="Optimizer Options", description=None)
+	#Optimization Arguments
+	optimizer_parser.add_argument("--no_opt" dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh).")
+	optimizer_parser.add_argument("--avoid_kmers", type=int, dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
+	optimizer_parser.add_argument("--avoid_kmers_boost", type=float, dest="kmer_boost", default=10.0, help="TODO: fill out this help. Default to %(default)s")
+	optimizer_parser.add_argument("--avoid_patterns", dest="avoid_patterns", help="DNA sequence patterns to avoid, listed as a comma separated list (no spaces!)")
+	optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="The names of the enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII")
+	optimizer_parser.add_argument("--species", "-s", dest="species", default="e_coli", help="specifies the codon bias table to use as a comma separated list. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
+	#parser.add_argument("--codon_bias_table", dest="codon_bias_table_filename", help="overrides species, gives a custom codon bias table. See <NEED EXAMPLE> for example of formatting")
+	optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible. Defaults to %(default)s", default=False, action="store_true")
+	optimizer_parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", action="store_true", default=True, help="homopolymers can complicate synthesis. We minimize them by default, but you can turn this off")
+	optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", action="store_true", default=True, help="hairpins can cause problems during synthesis so this gives the option to avoid them. Default to %(default)s)")
+	optimizer_parser.add_argument("--optimize_terminal_GC_content", action="store_true", default=True, help="TODO: need to implement this AND write a helpful help")
+	optimizer_parser.add_argument("--constrain_CAI", dest="CAI_lower_bound", type=float, default=0.8, help="TODO: fill out help") ##UNCLEAR if this actually helps since CodonOptimize is this exact thing
+	#some argument for avoiding other kmer repeats?
+	#some argument for avoiding homopolymer?
 
-args = parser.parse_args()
+	#NOTE: using action="store_true" and default=True makes no sense. This is not an option
 
-rec_counter = 1
-inserts_to_optimize = []
-if args.input_mode == "protein_fasta_file":
-	for input_filename in args.input:
-		for record in SeqIO.parse(input_filename, 'fasta'):
-			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+	output_parser = parser.add_argument_group(title="Output Options", description=None)
+	#Output Arguments
+	output_parser.add_argument("--output_mode", dest="output_mode", default="print", help="supported output modes: print (to terminal) (default), fasta, or genbank. If no output_filename is supplied but a non-print option is selected, it'll just use the name of the input (from the fasta file) or \"domesticator_optimization\" if none specified.")
+	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
+
+	args = parser.parse_args()
+
+
+	#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
+
+
+
+
+
+
+
+
+
+
+
+	rec_counter = 1
+	inserts_to_optimize = []
+	if args.input_mode == "protein_fasta_file":
+		for input_filename in args.input:
+			for record in SeqIO.parse(input_filename, 'fasta'):
+				record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+				inserts_to_optimize.append(record)
+	elif args.input_mode == "DNA_fasta_file":
+		for input_filename in args.input:
+			for record in SeqIO.parse(input_filename, 'fasta'):
+				assert(len(record.seq) % 3 == 0)
+				record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
+				inserts_to_optimize.append(record)
+	elif args.input_mode == "protein_sequnce":
+		for input_sequence in args.input:
+			record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+			rec_counter += 1
 			inserts_to_optimize.append(record)
-elif args.input_mode == "DNA_fasta_file":
-	for input_filename in args.input:
-		for record in SeqIO.parse(input_filename, 'fasta'):
-			assert(len(record.seq) % 3 == 0)
-			record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
+
+	elif args.input_mode == "DNA_sequence":
+		for input_sequence in args.input:
+			record = SeqRecord(Seq(input_sequence,IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+			rec_counter += 1
 			inserts_to_optimize.append(record)
-elif args.input_mode == "protein_sequnce":
-	for input_sequence in args.input:
-		record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
-		rec_counter += 1
-		inserts_to_optimize.append(record)
 
-elif args.input_mode == "DNA_sequence":
-	for input_sequence in args.input:
-		record = SeqRecord(Seq(input_sequence,IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
-		rec_counter += 1
-		inserts_to_optimize.append(record)
+	elif args.input_mode == "PDB":
+		chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		parser = PDBParser()
+		ppb=PPBuilder()
+		for input_pdb in args.input:
+			for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
+				seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
+				name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
+				record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
+				inserts_to_optimize.append(record)
+	else:
+		exit("input mode not recognized: " + args.input_mode)
+		
+	if args.vector:
+		vector = load_template(args.vector)	
+	else:
+		vector = SeqRecord("")
+		#empty vector
 
-elif args.input_mode == "PDB":
-	chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	parser = PDBParser()
-	ppb=PPBuilder()
-	for input_pdb in args.input:
-		for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
-			seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
-			name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
-			record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
-			inserts_to_optimize.append(record)
-else:
-	exit("input mode not recognized: " + args.input_mode)
-	
-if args.vector:
-	vector = load_template(args.vector)	
-else:
-	vector = SeqRecord("")
-	#empty vector
-
-#now load all the custom global constraints and objectives?
+	#now load all the custom global constraints and objectives?
 
 
-for insert in inserts_to_optimize:
-	print(vector)
-	vector = insert_into_vector(vector, args.destination, insert)
-	print(vector)
-	SeqIO.write([vector], "result.gb", "genbank")
-	print("done")
+	for insert in inserts_to_optimize:
+		print(vector)
+		vector = insert_into_vector(vector, args.destination, insert)
+		print(vector)
+		SeqIO.write([vector], "result.gb", "genbank")
+		print("done")
+
+		exit()
+
+
+
+
+
+		constraints = []
+		objectives = []
+		#if a vector is provided, read it in, parse out the vector/cloning scheme-specific constraints, and insert initial sequence
+
+
+
+
+
+
+
+
+
+
 
 	exit()
 
@@ -446,9 +419,6 @@ for insert in inserts_to_optimize:
 
 
 
-	constraints = []
-	objectives = []
-	#if a vector is provided, read it in, parse out the vector/cloning scheme-specific constraints, and insert initial sequence
 
 
 
@@ -459,9 +429,7 @@ for insert in inserts_to_optimize:
 
 
 
-
-exit()
-
+#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
 
 
 
