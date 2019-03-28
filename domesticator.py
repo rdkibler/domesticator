@@ -116,18 +116,21 @@ import os
 
 
 
-def load_template(filename):
+def load_template(filename, insert, destination):
 	''' func descriptor '''
 
+	objectives = []
+	constraints = []
+
 	vector = SeqIO.read(filename, "genbank")
+	problem = insert_into_vector(vector, destination, insert)
 	feats = [feat.qualifiers for feat in vector.features]
-	#beware, the keywords tag may not exist
-	#keywords = {kw.strip("\"").split(":")[0] : kw.strip("\"").split(":")[1:] for kw in vector.annotations['keywords'][0].split(' ')}
+	if 'keywords' in vector.annotations:
+		keywords = {kw.strip("\"").split(":")[0] : kw.strip("\"").split(":")[1:] for kw in vector.annotations['keywords'][0].split(' ')}
+		
 
 
-
-
-	#prevent everything except destination from changing
+	#prevent everything except destination from changing. To do that, I really need knowledge of the insert...
 
 	#Need to fined the dom_destination feature type which has the same label as destination_label
 	#scream loudly if this wasn't found.
@@ -140,9 +143,10 @@ def load_template(filename):
 	#use keywords for global constraints/objectives
 	#can I use features for local constraints/objectives?
 
+	
 
 	#This seq should be a SeqRecord object
-	return vector
+	return problem, objectives, constraints
 
 
 
@@ -151,7 +155,12 @@ def replace_sequence_in_record(record, location, new_seq):
 	#print(dir(location))
 	#print(location.extract(record.seq))
 	#print(record.seq[location.start:location.end])
-	adjusted_seq = record.seq[:location.start] + new_seq.seq + record.seq[location.end:]
+	
+	if location.strand >= 0:
+		adjusted_seq = record.seq[:location.start] + new_seq.seq + record.seq[location.end:]
+	else:
+		adjusted_seq = record.seq[:location.start] + new_seq.reverse_complement().seq + record.seq[location.end:]
+
 	#exit(adjusted_seq)
 	record.seq = adjusted_seq
 
@@ -248,6 +257,7 @@ def insert_into_vector(vector, destination, new_seq):
 			break
 	if not destination_annotation:
 		exit("destination not found: " + destination)
+
 	#print(destination_annotation)
 
 	location = destination_annotation.location
@@ -257,9 +267,10 @@ def insert_into_vector(vector, destination, new_seq):
 	#print(dir(vector.features))
 	vector = replace_sequence_in_record(vector, location, new_seq)
 
+	#re-annotate the thing
+	new_loc = FeatureLocation(location.start, location.start + len(new_seq), strand=location.strand)
+	exit(new_seq)
 
-	#put in a new feature for this thing:
-	#exit("not implemented")
 	return vector
 
 
@@ -302,7 +313,7 @@ if __name__ == "__main__":
 
 	optimizer_parser = parser.add_argument_group(title="Optimizer Options", description=None)
 	#Optimization Arguments
-	optimizer_parser.add_argument("--no_opt" dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh).")
+	optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh).")
 	optimizer_parser.add_argument("--avoid_kmers", type=int, dest="avoid_kmers", default=9, help="avoid repeated sequences greater than k bases to help with gene synthesis. Turn off by setting 0. Default to %(default)s")
 	optimizer_parser.add_argument("--avoid_kmers_boost", type=float, dest="kmer_boost", default=10.0, help="TODO: fill out this help. Default to %(default)s")
 	optimizer_parser.add_argument("--avoid_patterns", dest="avoid_patterns", help="DNA sequence patterns to avoid, listed as a comma separated list (no spaces!)")
@@ -328,13 +339,6 @@ if __name__ == "__main__":
 
 
 	#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
-
-
-
-
-
-
-
 
 
 
@@ -377,18 +381,27 @@ if __name__ == "__main__":
 	else:
 		exit("input mode not recognized: " + args.input_mode)
 		
-	if args.vector:
-		vector = load_template(args.vector)	
-	else:
-		vector = SeqRecord("")
-		#empty vector
+
+
 
 	#now load all the custom global constraints and objectives?
 
 
 	for insert in inserts_to_optimize:
+		objectives = []
+		constraints = []
+		
+		if args.vector:
+			problem, objectives, constraints = load_template(args.vector, insert, args.destination)
+		else:
+			problem = insert
+
+
+
+		#load the cmd line objectives and constraints
+		#cmd line should overwrite vector
+
 		print(vector)
-		vector = insert_into_vector(vector, args.destination, insert)
 		print(vector)
 		SeqIO.write([vector], "result.gb", "genbank")
 		print("done")
