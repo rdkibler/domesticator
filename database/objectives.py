@@ -2,6 +2,8 @@ from dnachisel import *
 from collections import Counter
 from CAI import CAI
 import json
+from dnachisel.Location import Location
+
 
 class MinimizeKmerScore(Specification):
 	"""Minimize a "no-kmers" score."""
@@ -12,7 +14,7 @@ class MinimizeKmerScore(Specification):
 
 	def evaluate(self, problem):
 		"""Return a customized kmer score for the problem's sequence"""
-		sequence = problem.sequence
+		sequence = self.location.extract_sequence(problem.sequence)
 		all_kmers = [sequence[i:i + self.k] for i in range(len(sequence) - self.k)]
 		number_of_non_unique_kmers = sum([
 			count
@@ -63,7 +65,8 @@ class MaximizeCAI(Specification):
 
 	def evaluate(self, problem):
 		""" return a CAI for the problem's sequence"""
-		sequence = problem.sequence
+		
+		sequence = self.location.extract_sequence(problem.sequence)
 
 		score = CAI(sequence, weights=self.weights)
 
@@ -77,3 +80,119 @@ class MaximizeCAI(Specification):
 	def __str__(self):
 		"""String representation."""
 		return "CAI"
+
+#viennaRNA/RNAlib
+import RNA
+
+class MinimizeSecondaryStructure(Specification):
+	"""Uses ViannaRNA to calculate minimum free energy (MFE) over the specified location
+
+	window
+      Length of the sliding window, in nucleotides, for local SS stability.
+      If not provided, the global SS stability is considered
+
+    location
+      Location objet indicating that the Specification only applies to a
+      subsegment of the sequence. Make sure it is bigger than ``window``
+      if both parameters are provided
+      """
+	def __init__(self, window=None, location=None, boost=1.0):
+		self.boost = boost
+		self.window = window
+		if isinstance(location, tuple):
+            location = Location.from_tuple(location)
+        if location is not None and (location.strand == -1):
+            location = Location(location.start, location.end, 1)
+        self.location = location
+
+    #def initialize_on_problem(self, problem, role=None):
+    #    return self._copy_with_full_span_if_no_location(problem)
+    #^ copied from EnforceGCContent. May be beneficial to calcualte an initial value
+
+
+
+    def evaluate(self, problem):
+        """Return deltaG over the location."""
+        sequence = self.location.extract_sequence(problem.sequence)
+
+
+        gc = gc_content(sequence, window_size=self.window)
+        
+        breaches = (np.maximum(0, self.mini - gc) +
+                    np.maximum(0, gc - self.maxi))
+        score = - breaches.sum()
+        breaches_starts = wstart + (breaches > 0).nonzero()[0]
+
+        if len(breaches_starts) == 0:
+            breaches_locations = []
+        elif len(breaches_starts) == 1:
+            if self.window is not None:
+                start = breaches_starts[0]
+                breaches_locations = [[start, start + self.window]]
+            else:
+                breaches_locations = [[wstart, wend]]
+        else:
+            segments = [(bs, bs + self.window) for bs in breaches_starts]
+            groups = group_nearby_segments(
+                segments,
+                max_start_spread=max(1,  self.locations_span))
+            breaches_locations = [
+                (group[0][0], group[-1][-1])
+                for group in groups
+            ]
+
+        if breaches_locations == []:
+            message = "Passed !"
+        else:
+            breaches_locations = [Location(*loc) for loc in breaches_locations]
+            message = ("Out of bound on segments " +
+                       ", ".join([str(l) for l in breaches_locations]))
+        return SpecEvaluation(self, problem, score,
+                              locations=breaches_locations,
+                              message=message)
+
+
+
+
+
+
+    def localized(self, location, problem=None, with_righthand=True):
+        """Localize the GC content evaluation.
+        For a location, the GC content evaluation will be restricted
+        to [start - window, end + window]
+        """
+        # if self.location is not None:
+        if self.window is None:
+            # NOTE: this makes sense, but could be refined by computing
+            # how much the local bounds should be in order not to outbound
+            return self
+        new_location = self.location.overlap_region(location)
+        if new_location is None:
+            return None 
+ # VoidSpecification(parent_specification=self)
+        else:
+            extension = 0 if self.window is None else self.window - 1
+            extended_location = location.extended(
+                extension, right=with_righthand)
+            new_location = self.location.overlap_region(extended_location)
+        # else:
+        #     if self.window is not None:
+        #         new_location = location.extended(self.window + 1)
+        #     else:
+        #         new_location = None
+        return self.copy_with_changes(location=new_location)
+
+    def label_parameters(self):
+        show_mini = self.mini is not None
+        show_maxi = self.maxi is not None
+        show_target = not (show_mini or show_maxi)
+        show_window = self.window is not None
+
+        return (
+            show_mini * [('mini', "%.2f" % self.mini)] +
+            show_maxi * [('maxi', "%.2f" % self.maxi)] +
+            show_target * [('target',
+                           ("%.2f" % self.target) if self.target else '')] +
+            show_window * [('window',
+                            ("%d" % self.window) if self.window else '')]
+        )

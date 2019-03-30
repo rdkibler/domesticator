@@ -37,7 +37,7 @@ class ConstrainCAI(Specification):
 
 	def evaluate(self, problem):
 		""" return a CAI for the problem's sequence"""
-		sequence = problem.sequence
+		sequence = self.location.extract_sequence(problem.sequence)
 
 		cai = CAI(sequence, weights=self.weights)
 		

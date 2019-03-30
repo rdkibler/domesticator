@@ -130,18 +130,11 @@ def load_template(filename, insert, destination):
 		
 
 
-	#prevent everything except destination from changing. To do that, I really need knowledge of the insert...
-
-	#Need to fined the dom_destination feature type which has the same label as destination_label
-	#scream loudly if this wasn't found.
-
-	#replace the destination sequence with the insert_seq
-
-	#did the other features move around? 
+	#prevent everything except destination from changing by default if using a vector
 
 	#find the constraints and objectives. How are these stored?
-	#use keywords for global constraints/objectives
-	#can I use features for local constraints/objectives?
+	#use separate keywords for constraints and objectives
+	#and just have it be a giant list
 
 	
 
