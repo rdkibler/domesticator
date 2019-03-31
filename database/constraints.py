@@ -25,7 +25,8 @@ class ConstrainCAI(Specification):
 	best_possible_score = 1.0
 
 
-	def __init__(self, species, minimum):
+	def __init__(self, species, location, minimum):
+		self.location = location
 		self.minimum = minimum
 		self.species = species
 		if species == "e_coli":
@@ -57,7 +58,7 @@ class ConstrainCAI(Specification):
 		return SpecEvaluation(
 			self, problem,
 			score=score,
-			locations=[Location(0, len(sequence))],
+			locations=[self.location],
 			message=message
 		)
 

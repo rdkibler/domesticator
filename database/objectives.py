@@ -1,4 +1,5 @@
-from dnachisel import *
+##WASTEFUL to import *
+from dnachisel import * 
 from collections import Counter
 from CAI import CAI
 import json
@@ -8,9 +9,18 @@ from dnachisel.Location import Location
 class MinimizeKmerScore(Specification):
 	"""Minimize a "no-kmers" score."""
 
-	def __init__(self, k=9, boost=1.0):
+	def __init__(self, k=9, location=None, boost=1.0):
+		self.location = location
 		self.k = k
 		self.boost = boost
+
+	def initialize_on_problem(self, problem, role=None):
+		return self._copy_with_full_span_if_no_location(problem)
+		# if self.location is None:
+		#     location = Location(0, len(problem.sequence))
+		#     return self.copy_with_changes(location=location)
+		# else:
+		#     return self
 
 	def evaluate(self, problem):
 		"""Return a customized kmer score for the problem's sequence"""
@@ -25,7 +35,7 @@ class MinimizeKmerScore(Specification):
 		return SpecEvaluation(
 			self, problem,
 			score=score,
-			locations=[Location(0, len(sequence))],
+			locations=[self.location],
 			message="Score: %.02f (%d non-unique %d-mers)" % (
 				score, number_of_non_unique_kmers, self.k
 			)
@@ -53,9 +63,12 @@ S_CEREVISIAE_WTS = "/home/rdkibler/projects/domesticator/database/CAI/scTable.wt
 
 
 class MaximizeCAI(Specification):
-	"""Maximizes CAI. Uses https://github.com/Benjamin-Lee/CodonAdaptationIndex/. """
-	def __init__(self, species, boost=1.0):
+	"""Maximizes CAI. Uses https://github.com/Benjamin-Lee/CodonAdaptationIndex/. 
+	
+	"""
+	def __init__(self, species, location=None, boost=1.0):
 		self.boost = boost
+		self.location = location
 		if species == "e_coli":
 			self.weights = json.load(open(E_COLI_WTS))
 		elif species == "h_sapiens":
@@ -63,9 +76,18 @@ class MaximizeCAI(Specification):
 		elif species == "s_cerevisiae":
 			self.weights = json.load(open(S_CEREVISIAE_WTS))
 
+
+	def initialize_on_problem(self, problem, role=None):
+		return self._copy_with_full_span_if_no_location(problem)
+		# if self.location is None:
+		#     location = Location(0, len(problem.sequence))
+		#     return self.copy_with_changes(location=location)
+		# else:
+		#     return self
+
 	def evaluate(self, problem):
 		""" return a CAI for the problem's sequence"""
-		
+
 		sequence = self.location.extract_sequence(problem.sequence)
 
 		score = CAI(sequence, weights=self.weights)
@@ -73,7 +95,7 @@ class MaximizeCAI(Specification):
 		return SpecEvaluation(
 			self, problem,
 			score=score,
-			locations=[Location(0, len(sequence))],
+			locations=[self.location],
 			message="CAI: %.02f" % (score)
 		)
 
@@ -81,118 +103,75 @@ class MaximizeCAI(Specification):
 		"""String representation."""
 		return "CAI"
 
-#viennaRNA/RNAlib
-import RNA
+
+
+#import RNA
+from RNA import fold_compound, OPTION_MFE, OPTION_WINDOW
 
 class MinimizeSecondaryStructure(Specification):
 	"""Uses ViannaRNA to calculate minimum free energy (MFE) over the specified location
 
-	window
-      Length of the sliding window, in nucleotides, for local SS stability.
-      If not provided, the global SS stability is considered
+	max_energy
+		How strong can the feature be before it gets flagged
 
-    location
-      Location objet indicating that the Specification only applies to a
-      subsegment of the sequence. Make sure it is bigger than ``window``
-      if both parameters are provided
-      """
-	def __init__(self, window=None, location=None, boost=1.0):
+	window
+	  Length of the sliding window, in nucleotides, for local MFE.
+	  If not provided, the global MFE is considered
+
+	temperature
+		parameter for ViennaRNA. The temperature to predict secondary structure at
+
+	location
+	  Location objet indicating that the Specification only applies to a
+	  subsegment of the sequence. Make sure it is bigger than ``window``
+	  if both parameters are provided
+	  """
+	def __init__(self, max_energy=-5.0, location=None, boost=1.0):
+		self.max_e = max_energy
 		self.boost = boost
 		self.window = window
+
 		if isinstance(location, tuple):
-            location = Location.from_tuple(location)
-        if location is not None and (location.strand == -1):
-            location = Location(location.start, location.end, 1)
-        self.location = location
+			location = Location.from_tuple(location)
+		if location is not None and (location.strand == -1):
+			location = Location(location.start, location.end, 1)
+		self.location = location
 
-    #def initialize_on_problem(self, problem, role=None):
-    #    return self._copy_with_full_span_if_no_location(problem)
-    #^ copied from EnforceGCContent. May be beneficial to calcualte an initial value
+	def initialize_on_problem(self, problem, role=None):
+		##I will need to implement this better probably?
 
+		#will this do the whole seq? Also, will RNA tolerate DNA?
+		self._copy_with_full_span_if_no_location(problem)
+		return self
+   
+	def mfe_window_callback(self,start,end,structure,energy,data=None):
+		if energy < self.max_e:
+			data.append({'structure':structure,'start':start,'end':end,'energy':energy})
 
+	def evaluate(self, problem):
+		"""Return deltaG over the location."""
+		fc = fold_compound(problem.sequence, None, OPTION_MFE | OPTION_WINDOW)
+		
+		hairpins = []
 
-    def evaluate(self, problem):
-        """Return deltaG over the location."""
-        sequence = self.location.extract_sequence(problem.sequence)
+		mfe = fc.mfe_window_cb(mfe_window_callback, hairpins)
 
+		message = "overall mfe: %0.2f kcal/mol; num violations: %d" % (mfe, len(hairpins))
+		
+		#locations are defined by lists of the start and stop of the segment with the problem
+		hairpin_locations = [(hp['start'], hp['end']) for hp in hairpins]
+		
+		return SpecEvaluation(self, problem, mfe,
+							  locations=hairpin_locations,
+							  message=message)
 
-        gc = gc_content(sequence, window_size=self.window)
-        
-        breaches = (np.maximum(0, self.mini - gc) +
-                    np.maximum(0, gc - self.maxi))
-        score = - breaches.sum()
-        breaches_starts = wstart + (breaches > 0).nonzero()[0]
+	#do I need to implement localized?
 
-        if len(breaches_starts) == 0:
-            breaches_locations = []
-        elif len(breaches_starts) == 1:
-            if self.window is not None:
-                start = breaches_starts[0]
-                breaches_locations = [[start, start + self.window]]
-            else:
-                breaches_locations = [[wstart, wend]]
-        else:
-            segments = [(bs, bs + self.window) for bs in breaches_starts]
-            groups = group_nearby_segments(
-                segments,
-                max_start_spread=max(1,  self.locations_span))
-            breaches_locations = [
-                (group[0][0], group[-1][-1])
-                for group in groups
-            ]
+	def label_parameters(self):
 
-        if breaches_locations == []:
-            message = "Passed !"
-        else:
-            breaches_locations = [Location(*loc) for loc in breaches_locations]
-            message = ("Out of bound on segments " +
-                       ", ".join([str(l) for l in breaches_locations]))
-        return SpecEvaluation(self, problem, score,
-                              locations=breaches_locations,
-                              message=message)
+		self.max_e
+		self.boost
 
-
-
-
-
-
-    def localized(self, location, problem=None, with_righthand=True):
-        """Localize the GC content evaluation.
-        For a location, the GC content evaluation will be restricted
-        to [start - window, end + window]
-        """
-        # if self.location is not None:
-        if self.window is None:
-            # NOTE: this makes sense, but could be refined by computing
-            # how much the local bounds should be in order not to outbound
-            return self
-        new_location = self.location.overlap_region(location)
-        if new_location is None:
-            return None 
- # VoidSpecification(parent_specification=self)
-        else:
-            extension = 0 if self.window is None else self.window - 1
-            extended_location = location.extended(
-                extension, right=with_righthand)
-            new_location = self.location.overlap_region(extended_location)
-        # else:
-        #     if self.window is not None:
-        #         new_location = location.extended(self.window + 1)
-        #     else:
-        #         new_location = None
-        return self.copy_with_changes(location=new_location)
-
-    def label_parameters(self):
-        show_mini = self.mini is not None
-        show_maxi = self.maxi is not None
-        show_target = not (show_mini or show_maxi)
-        show_window = self.window is not None
-
-        return (
-            show_mini * [('mini', "%.2f" % self.mini)] +
-            show_maxi * [('maxi', "%.2f" % self.maxi)] +
-            show_target * [('target',
-                           ("%.2f" % self.target) if self.target else '')] +
-            show_window * [('window',
-                            ("%d" % self.window) if self.window else '')]
-        )
+		return (
+					[('max_energy', str(self.max_e))]
+		)
