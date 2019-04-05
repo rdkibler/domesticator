@@ -105,7 +105,8 @@ class MaximizeCAI(Specification):
 
 
 class MaximizeDicodonAdaptiveIndex(Specification):
-	pass
+	def __init__(self):
+		raise NotImplementedError("AvoidAlternativeStarts not implmented")
 
 
 #import RNA

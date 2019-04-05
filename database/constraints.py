@@ -5,8 +5,47 @@ from CAI import CAI
 
 #how to write constriaints?
 
+class AvoidHiddenStops(Specification):
+	
+	def __init__(self):
+		raise NotImplementedError("AvoidHiddenStops not implmented")
 
 ##need constraint for alternative start sites
+class AvoidAlternativeStarts(Specification):
+	"""Make sure there aren't any RBS-like regions upstream of ATGs. Supports E. coli and yeast
+	
+	Parameters
+	----------
+	species
+		A string defining which translation inition site consensus to use
+
+	"""
+
+	def __init__(self, species):
+		raise NotImplementedError("AvoidAlternativeStarts not implmented")
+		self.species = species
+
+	def detect_ecoli(self, problem):
+		"""
+		This should just be looking for A/G rich a bit up stream of ATG
+		"""
+		pass
+
+	def detect_yeast(self, problem):
+		"""
+		the TIS in budding yeast has a narrow consensus sequence
+
+		Consensus0.5,−0.5 = N A\\T A\\(C|T) N\\G A\\T AUG G C\\(A|T))
+
+		defined by the frequency weight matrix for HiConf TISs (Fig. 1), where A\\(G|U) denotes ‘A and not G and not T’
+		"""
+		pass
+
+	def evaluate(self, problem):
+		pass
+
+	def __str__(self):
+		return "Avoiding alternative starts for " + self.species
 
 
 class ConstrainCAI(Specification):
@@ -26,6 +65,7 @@ class ConstrainCAI(Specification):
 
 
 	def __init__(self, species, location, minimum):
+		raise NotImplementedError("ConstrainCAI not implmented")
 		self.location = location
 		self.minimum = minimum
 		self.species = species

@@ -206,18 +206,17 @@ def replace_sequence_in_record(record, location, new_seq):
 
 
 
-def insert_into_vector(vector, destination, new_seq):
-	destination_annotation = None
-	for feat in vector.features:
-		if feat.qualifiers['label'][0] == destination:
-			destination_annotation = feat
-
+def find_annotation(record, label):
+	for feat in record.features:
+		if feat.qualifiers['label'][0] == label:
 			#I will be replacing it so remove it:
 			#vector.features.remove(feat)
-			break
-	if not destination_annotation:
-		exit("destination not found: " + destination)
+			return feat
+	exit("label not found: " + label)
 
+def insert_into_vector(vector, destination, new_seq):
+	
+	destination_annotation = find_annotation(vector, destination)
 	#print(destination_annotation)
 
 	location = destination_annotation.location
@@ -279,25 +278,13 @@ def load_inserts(inputs, mode):
 
 	return inserts
 
-def vector_writer():
-	pass
-
-#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
-
 
 if __name__ == "__main__":
 
 	parser=argparse.ArgumentParser(prog='domesticator', description='The coolest codon optimizer on the block')
 
-	parser.add_argument('--version', action='version', version='%(prog)s 0.2')
+	parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
-	#Input Arguments
-	#parser.add_argument("--dna_sequence","-d",dest="dna_sequence",help="DNA sequence you want to optimize. Required and mutaually exclusive with --protein_sequence, --dna_fasta, and --protein_fasta.")
-	#parser.add_argument("--protein_sequence","-p",dest="protein_sequence",help="protein sequence you want to back translate and optimize. Required and mutually exclusive with --dna_sequence, dna_fasta, and protein_fasta")
-	#parser.add_argument("--dna_fasta","-D",dest="dna_fasta",help="fasta file containing dna sequences you want to optimize")
-	#parser.add_argument("--protein_fasta","-P",dest="protein_fasta",help="fasta file containing protein sequences you want to back translate and optimize")
-	#parser.add_argument("--sequence_name", "-n",dest="name",help="Use with --dna_sequence or --protein_sequence. Specify the name to be associated with the inputted sequence. default to %(default)s", default="gblock")
-	#parser.add_argument("--cds",dest="is_cds",action="store_true",default=True, help="I assume that any DNA sequence given to me is a CoDing Sequence (CDS) unless specified")
 	input_parser = parser.add_argument_group(title="Input Options", description=None)
 	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
 	input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_sequence", 	help="Input mode. %(default)s by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
@@ -312,17 +299,12 @@ if __name__ == "__main__":
 	optimizer_parser = parser.add_argument_group(title="Optimizer Options", description="These are only used if a vector is not specified or if create_template is set.")
 	#Optimization Arguments
 	optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh). Turns off all non-critical objectives and constraints")
-	optimizer_parser.add_argument("--create_template", dest="create_template", metavar="path/to/file.gb", default=None, help="Provide this with an output filename in order to perform no optimization and print a template file with the specified optimization and ordering parameters instead.")
+	optimizer_parser.add_argument("--create_template", dest="create_template", metavars="path/to/file.gb", default=None, help="Provide this with an output filename and the name of the destination annotation in order to perform no optimization and print a template file with the specified optimization instead.")
 
 	#optimizer options
 	optimizer_parser.add_argument("--species", dest="species", default="e_coli", help="specifies the codon and dicodon bias tables to use. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
 	optimizer_parser.add_argument("--codon_optimization_boost", dest="codon_optimization_boost", help="Give a multiplier to the codon optimizer itself. Default to %(default)f", default=1.0)
 	optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible.", default=False, action="store_true")
-
-
-
-
-
 
 	optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", type=bool, default=False, help="Removes hairpins according to IDT's definition of a hairpin. A quicker and dirtier alternative to avoid_secondary_structure. Default to %(default)s")
 
@@ -335,15 +317,16 @@ if __name__ == "__main__":
 
 	optimizer_parser.add_argument("--prevent_restriction_sites", dest="prevent_restriction_sites", help="Enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII", nargs="?", metavar="enzy", type=str)
 
-
+	optimizer_parser.add_argument("--constrain_global_GC_content", type=bool, default=True, help="TODO")
 	optimizer_parser.add_argument("--global_GC_content_min", type=float, default=0.4, help="TODO")
 	optimizer_parser.add_argument("--global_GC_content_max", type=float, default=0.65, help="TODO")
 
+	optimizer_parser.add_argument("--constrain_local_GC_content", type=bool, default=True, help="TODO")
 	optimizer_parser.add_argument("--local_GC_content_min", type=float, default=0.25, help="TODO")
 	optimizer_parser.add_argument("--local_GC_content_max", type=float, default=0.8, help="TODO")
 	optimizer_parser.add_argument("--local_GC_content_window", type=int, default=50, help="TODO")
 
-
+	optimizer_parser.add_argument("--constrain_terminal_GC_content", type=bool, default=False, help="TODO")
 	optimizer_parser.add_argument("--terminal_GC_content_min", type=float, default=0.5, help="TODO")
 	optimizer_parser.add_argument("--terminal_GC_content_max", type=float, default=0.9, help="TODO")
 	optimizer_parser.add_argument("--terminal_GC_content_window", type=int, default=16, help="TODO")
@@ -355,8 +338,8 @@ if __name__ == "__main__":
 	optimizer_parser.add_argument("--avoid_secondary_structure", type=bool, default=True, help="TODO")
 	optimizer_parser.add_argument("--avoid_secondary_structure_boost", type=float, default=1.0, help="TODO. Has no effect if --avoid_secondary_structure is not set")
 
-	optimizer_parser.add_argument("--avoid_5'_secondary_structure", type=bool, default=True, help="TODO")
-	optimizer_parser.add_argument("--avoid_5'_secondary_structure_boost", type=float, default=1.0, help="TODO. Has no effect if --avoid_5'_secondary_structure is not set")
+	optimizer_parser.add_argument("--avoid_initiator_secondary_structure", type=bool, default=True, help="TODO")
+	optimizer_parser.add_argument("--avoid_initiator_secondary_structure_boost", type=float, default=1.0, help="TODO. Has no effect if --avoid_5'_secondary_structure is not set")
 
 
 	ordering_parser = parser.add_argument_group(title="Ordering Options", description=None)
@@ -365,55 +348,98 @@ if __name__ == "__main__":
 
 	output_parser = parser.add_argument_group(title="Output Options", description=None)
 	#Output Arguments
-	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
+	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
 	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
 	args = parser.parse_args()
-
-
-	#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
 
 
 	inserts = load_inserts(args.input, args.input_mode)
 
 	#now load all the custom global constraints and objectives?
 
+	outputs = []
+
 	for insert in inserts:
 		if args.vector:
+
+			args.output_mode = 'none'
 			naive_construct, objectives, constraints = load_template(args.vector, insert, args.destination)
 		else:
+			#wasn't given a vector
 			naive_construct = insert
 			objectives = []
 			constraints = []
 
+			location = Location(0, len(insert))
+
+			if args.create_template:
+				naive_construct, objectives, constraints = load_template(args.create_template, insert, args.destination)
+
+				location = find_annotation(naive_construct, args.destination)
+
+			
+
 			#set enforce translation to the whole thing
-			objectives += [CodonOptimize(species=args.species, location=???), EnforceTranslation(location=???)]
+			if args.harmonized:
+				opt_mode = 'harmonized'
+			else:
+				opt_mode = 'best_codon'
+			objectives += [
+				CodonOptimize(species=args.species, location=location, mode=opt_mode), 
+				EnforceTranslation(location=location)]
 
 			#time to set anything in the commandline. 
 
 			if args.avoid_homopolymers:
 				constraints += [
-                AvoidPattern(homopolymer_pattern("A",args.avoid_homopolymers)),
-                AvoidPattern(homopolymer_pattern("T",args.avoid_homopolymers)),
-                AvoidPattern(homopolymer_pattern("G",args.avoid_homopolymers)),
-                AvoidPattern(homopolymer_pattern("C",args.avoid_homopolymers))]
+                AvoidPattern(homopolymer_pattern("A",args.avoid_homopolymers),location=location),
+                AvoidPattern(homopolymer_pattern("T",args.avoid_homopolymers),location=location),
+                AvoidPattern(homopolymer_pattern("G",args.avoid_homopolymers),location=location),
+                AvoidPattern(homopolymer_pattern("C",args.avoid_homopolymers),location=location)]
 
             if args.avoid_hairpins:
-				constraints += [AvoidHairpins()]
+				constraints += [AvoidHairpins(location=location)]
 
 			if args.prevent_patterns:
-				constraints += [AvoidPattern(pattern) for pattern in args.prevent_patterns]
+				constraints += [AvoidPattern(pattern,location=location) for pattern in args.prevent_patterns]
 
 			if args.prevent_restriction_sites:
-				constraints += [AvoidPattern(XXX)]
+				constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.prevent_restriction_sites]
+
+			if args.constrain_global_GC_content:
+				constraints += [EnforceGCContent(mini=args.global_GC_content_min, maxi=args.global_GC_content_max, location=location)]
+
+			if args.constrain_local_GC_content:
+				constraints += [EnforceGCContent(mini=args.local_GC_content_min, maxi=args.global_GC_content_max, window=args.local_GC_content_window, location=location)]
+
+			if args.constrain_terminal_GC_content:
+				constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
+
+			if args.constrain_CAI:
+				constraints += [ConstrainCAI(species=args.species, minimum=args.CAI_minimum, location=location)]
+
+			if args.optimize_dicodon_frequency:
+				objectives += [MaximizeDicodonAdaptiveIndex()]
+
+			if args.avoid_secondary_structure:
+				objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_secondary_structure_max_e, location=location, boost=args.avoid_secondary_structure_boost)]
+
+			if args.avoid_initiator_secondary_structure:
+				if location.strand == 1:
+					initiator_span = Location(location.start - 30, location.start + 30, 1)
+				else:
+					initiator_span = Location(location.end - 30, location.end + 30, -1)
+
+				objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_initiator_secondary_structure_max_e, location=initiator_span, boost=args.avoid_initiator_secondary_structure_boost)]
 			
 
 		problem = DnaOptimizationProblem(naive_construct.seq, constrains=constraints, objectives=objectives)
 
 		if args.create_template:
 			record = problem.to_record()
-			raise NotImplementedError("creating templates is not yet supported")
 			SeqIO.write(record, args.create_template, "genbank")
+			exit()
 		else:
 			##optimize
 			problem.resolve_constraints()
@@ -423,11 +449,32 @@ if __name__ == "__main__":
 			mature_construct = naive_construct
 			mature_construct.seq = Seq(problem.sequence, alphabet=IUPAC.unambiguous_dna)
 
+			if args.vector:
+				template_basename = 
+				seq_name = 
+				custom_filename = template_basename
+				SeqIO.write([mature_construct], custom_filename, "genbank")
+
+			outputs.append(mature_construct)
+
 			#take vector name and replace the destination name with the insert name?
 
-			#does this work right with 
+			#does this work right?
 
 
+	#SO ordering... How does ordering work. 
+
+
+
+
+	#time to handle IO
+	if args.output_mode == 'none':
+		continue
+	elif args.output_mode == 'terminal':
+		for output in outputs:
+			print(output.format("fasta"))
+	elif args.output_mode:
+		SeqIO.write(mature_construct, args.output_filename, args.output_mode)
 
 
 	exit()
