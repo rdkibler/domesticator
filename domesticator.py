@@ -44,7 +44,7 @@ from dnachisel import reverse_translate
 import argparse
 import warnings
 from Bio import SeqIO
-from Bio.SeqFeature import *
+#from Bio.SeqFeature import *
 from Bio.Seq import (MutableSeq, Seq)
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
@@ -463,8 +463,11 @@ if __name__ == "__main__":
 
 
 	#SO ordering... How does ordering work. 
-
-
+	if args.order_type == "gBlocks":
+		SeqIO.write([find_annotation(output, "gBlock_to_order").location.extract(output.seq) for output in outputs], "order.fasta", "fasta")
+	elif args.order_type == "genes":
+		#simply output the thing having been inserted. 
+		SeqIO.write([find_annotation(output, "gene_to_order").location.extract(output.seq) for output in outputs], "order.fasta", "fasta")
 
 
 	#time to handle IO
