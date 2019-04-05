@@ -104,9 +104,15 @@ class MaximizeCAI(Specification):
 		return "CAI"
 
 
+class MaximizeDicodonAdaptiveIndex(Specification):
+	pass
+
 
 #import RNA
-from RNA import fold_compound, OPTION_MFE, OPTION_WINDOW
+try:
+	from RNA import fold_compound, OPTION_MFE, OPTION_WINDOW
+except:
+	exit("please install RNAlib (https://www.tbi.univie.ac.at/RNA/)")
 
 class MinimizeSecondaryStructure(Specification):
 	"""Uses ViannaRNA to calculate minimum free energy (MFE) over the specified location
