@@ -48,7 +48,7 @@ from Bio.SeqFeature import *
 from Bio.Seq import (MutableSeq, Seq)
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
-from Bio.PDB import PDBParser, PPBuilder
+#from Bio.PDB import PDBParser, PPBuilder
 import constraints
 import objectives
 import os
@@ -262,14 +262,17 @@ def load_inserts(inputs, mode):
 			inserts.append(record)
 
 	elif mode == "PDB":
-		chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		parser = PDBParser()
-		ppb=PPBuilder()
+		#chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		#parser = PDBParser()
+		#ppb=PPBuilder()
 		for input_pdb in inputs:
-			for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
-				seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
-				name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
-				record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
+			#for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
+			for record in SeqIO.parse(input_pdb, mode="pdb-atom")
+				#seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
+				#name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
+				#record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
+
+				record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 				inserts.append(record)
 	else:
 		exit("input mode not recognized: " + args.input_mode)
