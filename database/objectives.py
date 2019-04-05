@@ -136,7 +136,6 @@ class MinimizeSecondaryStructure(Specification):
 	def __init__(self, max_energy=-5.0, location=None, boost=1.0):
 		self.max_e = max_energy
 		self.boost = boost
-		self.window = window
 
 		if isinstance(location, tuple):
 			location = Location.from_tuple(location)
@@ -151,6 +150,7 @@ class MinimizeSecondaryStructure(Specification):
 		self._copy_with_full_span_if_no_location(problem)
 		return self
    
+
 	def mfe_window_callback(self,start,end,structure,energy,data=None):
 		if energy < self.max_e:
 			data.append({'structure':structure,'start':start,'end':end,'energy':energy})
@@ -160,6 +160,10 @@ class MinimizeSecondaryStructure(Specification):
 		fc = fold_compound(problem.sequence, None, OPTION_MFE | OPTION_WINDOW)
 		
 		hairpins = []
+
+		def mfe_window_callback(start,end,structure,energy,data=None):
+			if energy < self.max_e:
+				data.append({'structure':structure,'start':start,'end':end,'energy':energy})
 
 		mfe = fc.mfe_window_cb(mfe_window_callback, hairpins)
 
@@ -182,3 +186,6 @@ class MinimizeSecondaryStructure(Specification):
 		return (
 					[('max_energy', str(self.max_e))]
 		)
+
+	def __str__(self):
+		return "MinimizeSecondaryStructure"
