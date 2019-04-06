@@ -7,7 +7,7 @@
 
 
 
-
+print("Note: stop supporting DNA sequence inputs and multiple domestication sites")
 
 #New features I want:
 #	only optimize coding sequences
@@ -45,8 +45,9 @@ import argparse
 import warnings
 from Bio import SeqIO
 #from Bio.SeqFeature import *
-from Bio.Seq import (MutableSeq, Seq)
+from Bio.Seq import MutableSeq, Seq
 from Bio.SeqRecord import SeqRecord
+from Bio.SeqFeature import FeatureLocation
 from Bio.Alphabet import IUPAC
 #from Bio.PDB import PDBParser, PPBuilder
 from constraints import ConstrainCAI
@@ -55,13 +56,6 @@ import os
 
 
 
-def parse_objectives(objectives_strs):
-	print(objectives_strs)
-	exit()
-
-def parse_constraints(constraints_strs):
-	pass
-
 def load_template(filename, insert, destination):
 	''' func descriptor '''
 
@@ -69,38 +63,23 @@ def load_template(filename, insert, destination):
 	constraints = []
 
 	vector = SeqIO.read(filename, "genbank")
+	
+
 	vector, insert_location = insert_into_vector(vector, destination, insert)
-	feats = [feat.qualifiers for feat in vector.features]
+
+	problem = DnaOptimizationProblem.from_record(vector)
+	constraints += problem.constraints
+	objectives += problem.objectives
+
+	#feats = [feat.qualifiers for feat in vector.features]
 	#dnachisel hasn't implemented MultiLocation yet
 	#vector_location = FeatureLocation(insert_location.end, len(vector)) + FeatureLocation(0,insert_location.start)
-	vector_location_us = Location(0, insert_location.start, 1)
-	vector_location_ds = Location(insert_location.end, len(vector), 1)
+	#vector_location_us = Location(0, insert_location.start, 1)
+	#vector_location_ds = Location(insert_location.end, len(vector), 1)
 
-	constraints.append(EnforceTranslation(Location.from_biopython_location(insert_location)))
-	constraints.append(AvoidChanges(vector_location_us))
-	constraints.append(AvoidChanges(vector_location_ds))
-
-
-	if 'keywords' in vector.annotations:
-		#print(vector.annotations['keywords'])
-		keywords = {kw.strip("\"").split(":")[0] : kw.strip("\"").split(":")[1:] for kw in vector.annotations['keywords'][0].split(' ')}
-		if 'objectives' in keywords:
-			#print('objectives', keywords['objectives'][0].split('|'))
-			objectives = parse_objectives(keywords['objectives'][0].split('|'))
-		if 'constraints' in keywords:
-			#print('constraints', keywords['constraints'][0].split('|'))
-			constraints = parse_constraints(keywords['constraints'][0].split('|'))
-		exit()
-
-
-		
-
-
-	#prevent everything except destination from changing by default if using a vector
-
-	#find the constraints and objectives. How are these stored?
-	#use separate keywords for constraints and objectives
-	#and just have it be a giant list
+	#constraints.append(EnforceTranslation(Location.from_biopython_location(insert_location)))
+	#constraints.append(AvoidChanges(vector_location_us))
+	#constraints.append(AvoidChanges(vector_location_ds))
 
 
 
@@ -154,10 +133,15 @@ def replace_sequence_in_record(record, location, new_seq):
 			
 			#type 1: where the start and end are contained within the original location
 			#-> do not add it to the processed_features list
-			if subloc.start >= location.start and subloc.start <= location.end and subloc.end >= location.start and subloc.end <= location.end:
+			if subloc.start > location.start and subloc.start < location.end and subloc.end > location.start and subloc.end < location.end:
 				#print("start: %d and end: %d are contained within %s" % (subloc.start, subloc.end, location))
 				#print("omit")
 				continue
+
+			#type 1b: where the start and end are the same which will happen a lot for storing constraints and objectives
+			elif subloc.start == location.start and subloc.end == location.end:
+				new_loc = FeatureLocation(location.start, location.end + seq_diff, strand=subloc.strand)
+
 
 
 			#type 2: where they start or end inside the location
@@ -205,11 +189,61 @@ def replace_sequence_in_record(record, location, new_seq):
 
 	return record
 
+def load_user_options(args, location):
+	#set enforce translation to the whole thing
+	constraints = []
+	objectives = []
 
+	if args.harmonized:
+		opt_mode = 'harmonized'
+	else:
+		opt_mode = 'best_codon'
+	objectives += [
+		CodonOptimize(species=args.species, location=location, mode=opt_mode), 
+		EnforceTranslation(location=location)]
+
+	if args.avoid_homopolymers:
+		constraints += [
+		AvoidPattern(HomopolymerPattern("A",args.avoid_homopolymers),location=location),
+		AvoidPattern(HomopolymerPattern("T",args.avoid_homopolymers),location=location),
+		AvoidPattern(HomopolymerPattern("G",args.avoid_homopolymers),location=location),
+		AvoidPattern(HomopolymerPattern("C",args.avoid_homopolymers),location=location)]
+
+	if args.avoid_hairpins:
+		constraints += [AvoidHairpins(location=location)]
+
+	if args.avoid_patterns:
+		constraints += [AvoidPattern(pattern,location=location) for pattern in args.avoid_patterns]
+
+	if args.avoid_restriction_sites:
+		constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.avoid_restriction_sites]
+
+	if args.constrain_global_GC_content:
+		constraints += [EnforceGCContent(mini=args.global_GC_content_min, maxi=args.global_GC_content_max, location=location)]
+
+	if args.constrain_local_GC_content:
+		constraints += [EnforceGCContent(mini=args.local_GC_content_min, maxi=args.global_GC_content_max, window=args.local_GC_content_window, location=location)]
+
+	if args.constrain_terminal_GC_content:
+		constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
+
+	if args.constrain_CAI:
+		constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
+
+	if args.optimize_dicodon_frequency:
+		objectives += [MaximizeDicodonAdaptiveIndex()]
+
+	if args.avoid_secondary_structure:
+		objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_secondary_structure_max_e, location=location, boost=args.avoid_secondary_structure_boost)]
+
+	if args.avoid_initiator_secondary_structure:
+		objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_initiator_secondary_structure_max_e, location=location, optimize_initiator=True, boost=args.avoid_initiator_secondary_structure_boost)]
+
+	return objectives, constraints
 
 def find_annotation(record, label):
 	for feat in record.features:
-		if feat.qualifiers['label'][0] == label:
+		if label == feat.qualifiers['label'][0]:
 			#I will be replacing it so remove it:
 			#vector.features.remove(feat)
 			return feat
@@ -235,49 +269,73 @@ def insert_into_vector(vector, destination, new_seq):
 
 	return vector, insert_loc
 
-def load_inserts(inputs, mode):
+def load_inserts(inputs):
 	rec_counter = 1
 	inserts = []
-	if mode == "protein_fasta_file":
-		for input_filename in inputs:
-			for record in SeqIO.parse(input_filename, 'fasta'):
-				record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-				inserts.append(record)
-	elif mode == "DNA_fasta_file":
-		for input_filename in inputs:
-			for record in SeqIO.parse(input_filename, 'fasta'):
-				assert(len(record.seq) % 3 == 0)
-				record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
-				inserts.append(record)
-	elif mode == "protein_sequence":
-		for input_sequence in inputs:
+	chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	for this_input in inputs: 
+		if os.path.isfile(this_input):
+			ext = os.path.splitext(this_input)[1]
+			if ext == 'fasta':
+				for record in SeqIO.parse(input_filename, 'fasta'):
+					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+					inserts.append(record)
+			elif exit == 'pdb':
+				for chain_num, record in enumerate(SeqIO.parse(input_pdb, "pdb-atom")):
+					name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
+					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+					record.id=name
+					record.name=name
+					inserts.append(record)
+			else:
+				exit("extension not recognized: " + ext)
+		else:
 			record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
 			rec_counter += 1
 			inserts.append(record)
 
-	elif mode == "DNA_sequence":
-		for input_sequence in inputs:
-			record = SeqRecord(Seq(input_sequence,IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
-			rec_counter += 1
-			inserts.append(record)
 
-	elif mode == "PDB":
-		chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		#parser = PDBParser()
-		#ppb=PPBuilder()
-		for input_pdb in inputs:
-			#for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
-			for chain_num, record in enumerate(SeqIO.parse(input_pdb, "pdb-atom")):
-				#seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
-				name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
-				#record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
+	# if mode == "protein_fasta_file":
+	# 	for input_filename in inputs:
+	# 		for record in SeqIO.parse(input_filename, 'fasta'):
+	# 			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+	# 			inserts.append(record)
+	# # elif mode == "DNA_fasta_file":
+	# 	for input_filename in inputs:
+	# 		for record in SeqIO.parse(input_filename, 'fasta'):
+	# 			assert(len(record.seq) % 3 == 0)
+	# 			record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
+	# 			inserts.append(record)
+	# elif mode == "protein_sequence":
+	# 	for input_sequence in inputs:
+	# 		record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+	# 		rec_counter += 1
+	# 		inserts.append(record)
 
-				record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-				record.id=name
-				record.name=name
-				inserts.append(record)
-	else:
-		exit("input mode not recognized: " + args.input_mode)
+	# elif mode == "DNA_sequence":
+	# 	for input_sequence in inputs:
+	# 		record = SeqRecord(Seq(input_sequence,IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+	# 		rec_counter += 1
+	# 		inserts.append(record)
+
+	# elif mode == "PDB":
+	# 	chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	# 	#parser = PDBParser()
+	# 	#ppb=PPBuilder()
+	# 	for input_pdb in inputs:
+	# 		#for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
+	# 		for chain_num, record in enumerate(SeqIO.parse(input_pdb, "pdb-atom")):
+	# 			#seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
+	# 			name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
+	# 			#record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
+
+	# 			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+	# 			record.id=name
+	# 			record.name=name
+	# 			inserts.append(record)
+	# else:
+	# 	exit("input mode not recognized: " + args.input_mode)
 
 	return inserts
 
@@ -289,13 +347,14 @@ if __name__ == "__main__":
 	parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
 	input_parser = parser.add_argument_group(title="Input Options", description=None)
-	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
-	input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_sequence", 	help="Input mode. %(default)s by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
+	#input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
+	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="Protein sequence(s) or file(s) to be optimized. Valid inputs are full protein sequences and fasta and pdb files. This should be detected automatically")
+	#input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_sequence", 	help="Input mode. %(default)s by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
 
 	cloning_parser = parser.add_argument_group(title="Cloning Options", description=None)
 
 	cloning_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="HELP MESSAGE")
-	cloning_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT1", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
+	#cloning_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
 
 
 
@@ -359,18 +418,39 @@ if __name__ == "__main__":
 
 	args = parser.parse_args()
 
+	destination = "INSERT"
 
-	inserts = load_inserts(args.input, args.input_mode)
+	if args.create_template:
+		placeholder = SeqRecord("cgctatgcgaacaaaattgaactggaacgc", name="INSERT")
+		naive_construct, objectives, constraints = load_template(args.create_template, placeholder, destination)
+
+		dest_feat = find_annotation(naive_construct, placeholder.name)
+		dest_loc = dest_feat.location
+
+		user_objectives, user_constraints = load_user_options(args, dest_loc)
+
+		objectives += user_objectives
+		constraints += user_constraints
+
+		print(naive_construct)
+		exit(dest_feat)
+
+
+
+
+	inserts = load_inserts(args.input)
 
 	#now load all the custom global constraints and objectives?
 
 	outputs = []
 
+	
+
 	for insert in inserts:
 		if args.vector:
 
 			args.output_mode = 'none'
-			naive_construct, objectives, constraints = load_template(args.vector, insert, args.destination)
+			naive_construct, objectives, constraints = load_template(args.vector, insert, destination)
 		else:
 			#wasn't given a vector
 			naive_construct = insert
@@ -379,65 +459,11 @@ if __name__ == "__main__":
 
 			location = Location(0, len(insert))
 
-			if args.create_template:
-				naive_construct, objectives, constraints = load_template(args.create_template, insert, args.destination)
-
-				location = find_annotation(naive_construct, args.destination)
+			
 
 			
 
-			#set enforce translation to the whole thing
-			if args.harmonized:
-				opt_mode = 'harmonized'
-			else:
-				opt_mode = 'best_codon'
-			objectives += [
-				CodonOptimize(species=args.species, location=location, mode=opt_mode), 
-				EnforceTranslation(location=location)]
-
-			#time to set anything in the commandline. 
-
-			if args.avoid_homopolymers:
-				constraints += [
-				AvoidPattern(HomopolymerPattern("A",args.avoid_homopolymers),location=location),
-				AvoidPattern(HomopolymerPattern("T",args.avoid_homopolymers),location=location),
-				AvoidPattern(HomopolymerPattern("G",args.avoid_homopolymers),location=location),
-				AvoidPattern(HomopolymerPattern("C",args.avoid_homopolymers),location=location)]
-
-			if args.avoid_hairpins:
-				constraints += [AvoidHairpins(location=location)]
-
-			if args.avoid_patterns:
-				constraints += [AvoidPattern(pattern,location=location) for pattern in args.avoid_patterns]
-
-			if args.avoid_restriction_sites:
-				constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.avoid_restriction_sites]
-
-			if args.constrain_global_GC_content:
-				constraints += [EnforceGCContent(mini=args.global_GC_content_min, maxi=args.global_GC_content_max, location=location)]
-
-			if args.constrain_local_GC_content:
-				constraints += [EnforceGCContent(mini=args.local_GC_content_min, maxi=args.global_GC_content_max, window=args.local_GC_content_window, location=location)]
-
-			if args.constrain_terminal_GC_content:
-				constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
-
-			if args.constrain_CAI:
-				constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
-
-			if args.optimize_dicodon_frequency:
-				objectives += [MaximizeDicodonAdaptiveIndex()]
-
-			if args.avoid_secondary_structure:
-				objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_secondary_structure_max_e, location=location, boost=args.avoid_secondary_structure_boost)]
-
-			if args.avoid_initiator_secondary_structure:
-				if location.strand == 1:
-					initiator_span = Location(location.start - 30, location.start + 30, 1)
-				else:
-					initiator_span = Location(location.end - 30, location.end + 30, -1)
-
-				objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_initiator_secondary_structure_max_e, location=initiator_span, boost=args.avoid_initiator_secondary_structure_boost)]
+			objectives, constraints = load_user_options(args, location)
 			
 
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
@@ -452,13 +478,16 @@ if __name__ == "__main__":
 				problem.resolve_constraints()
 				problem.optimize()
 				problem.resolve_constraints(final_check=True)
+			else:
+				print(problem.constraints_text_summary())
+				print(problem.objectives_text_summary())
 
 			mature_construct = naive_construct
 			mature_construct.seq = Seq(problem.sequence, alphabet=IUPAC.unambiguous_dna)
 
 			if args.vector:
 				template_basename = os.path.basename(args.vector)
-				custom_filename = template_basename.replace(args.destination, mature_construct.name)
+				custom_filename = template_basename.replace(destination, mature_construct.name)
 				SeqIO.write([mature_construct], custom_filename, "genbank")
 
 			outputs.append(mature_construct)
@@ -469,6 +498,8 @@ if __name__ == "__main__":
 
 
 	#SO ordering... How does ordering work. 
+
+	#REMEMBER to set the description to "" for easy ordering
 	if args.order_type == "gBlocks":
 		SeqIO.write([find_annotation(output, "gBlock_to_order").location.extract(output.seq) for output in outputs], "order.fasta", "fasta")
 	elif args.order_type == "genes":
@@ -481,6 +512,7 @@ if __name__ == "__main__":
 		pass
 	elif args.output_mode == 'terminal':
 		for output in outputs:
+			output.description = ""
 			print(output.format("fasta"))
 	elif args.output_mode:
 		SeqIO.write(mature_construct, args.output_filename, args.output_mode)

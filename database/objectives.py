@@ -133,9 +133,10 @@ class MinimizeSecondaryStructure(Specification):
 	  subsegment of the sequence. Make sure it is bigger than ``window``
 	  if both parameters are provided
 	  """
-	def __init__(self, max_energy=-5.0, location=None, boost=1.0):
+	def __init__(self, max_energy=-5.0, location=None, optimize_initiator=False, boost=1.0):
 		self.max_e = max_energy
 		self.boost = boost
+		self.optimize_initiator = optimize_initiator
 
 		if isinstance(location, tuple):
 			location = Location.from_tuple(location)
@@ -146,8 +147,16 @@ class MinimizeSecondaryStructure(Specification):
 	def initialize_on_problem(self, problem, role=None):
 		##I will need to implement this better probably?
 
-		#will this do the whole seq? Also, will RNA tolerate DNA?
-		self._copy_with_full_span_if_no_location(problem)
+		if self.optimize_initiator:
+			if location.strand == 1:
+				self.location.end = self.location.start + 30
+				self.location.start = self.location.start - 30
+			else:
+				self.location.start = self.location.end - 30
+				self.location.end = self.location.end + 30
+		else:
+			#will this do the whole seq? Also, will RNA tolerate DNA?
+			self._copy_with_full_span_if_no_location(problem)
 		return self
    
 
