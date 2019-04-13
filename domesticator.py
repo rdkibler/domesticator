@@ -1,35 +1,6 @@
 #!/home/rdkibler/.conda/envs/domesticator/bin/python
 
-
-
 ##also look into pytest
-
-
-
-
-print("Note: stop supporting DNA sequence inputs and multiple domestication sites")
-
-#New features I want:
-#	only optimize coding sequences
-#	optimize against hairpins globally (even between coding and non-coding sequences)
-
-
-#What I want this to do is take a protein sequence and convert it into an orderable gblock
-#to do this, it'll need 
-#	1. the protein sequence, 
-#	2. the cloning scheme being used (MoClo-YTK, EMMA, BioBricks, etc)
-#	3. specific identification required by the clonging scheme (ie MoClo-YTK type) 
-#	Optional override to cloning scheme and identifiaction if you just specify the left and right flanking sequences 
-#	4. the destination organism (to optimize codon usage), 
-#	5. a list of sequences to avoid (like restriction sites) (default to avoid the type-II restriction sites or whatever sites used by whatever standards)
-#	6. the name of the sequence (has a default value)
-#	6. a flag specifiying output to be in the form of a fasta file (in which case you must also specifiy the file name), gb file, or fasta print to terminal
-#		if you write to gb file, then it'll include the cloning system you specify, the part type (or whatever), and specify wether or not the overhangs are custom
-
-
-#default behavior will be to codon optimize a cds
-#I plan on optimizing I definitely want to be able to optimize a sequence for synthesis/GC content while preserving patterns, however, I will not be implementing that right away
-
 import sys
 
 database='/home/rdkibler/projects/domesticator/database/'
@@ -47,11 +18,11 @@ from Bio import SeqIO
 #from Bio.SeqFeature import *
 from Bio.Seq import MutableSeq, Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import FeatureLocation
+from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.Alphabet import IUPAC
 #from Bio.PDB import PDBParser, PPBuilder
 from constraints import ConstrainCAI
-from objectives import MinimizeSecondaryStructure
+from objectives import MinimizeSecondaryStructure, MinimizeKmerScore
 import os
 
 
@@ -82,13 +53,8 @@ def load_template(filename, insert, destination):
 	#constraints.append(AvoidChanges(vector_location_ds))
 
 
-
-	
-
 	#This seq should be a SeqRecord object
 	return vector, objectives, constraints
-
-
 
 def replace_sequence_in_record(record, location, new_seq):
 	#print(record, location, new_seq)
@@ -190,6 +156,8 @@ def replace_sequence_in_record(record, location, new_seq):
 	return record
 
 def load_user_options(args, location):
+
+	assert(isinstance(location, Location))
 	#set enforce translation to the whole thing
 	constraints = []
 	objectives = []
@@ -215,6 +183,7 @@ def load_user_options(args, location):
 	if args.avoid_patterns:
 		constraints += [AvoidPattern(pattern,location=location) for pattern in args.avoid_patterns]
 
+	#NOTE! Printing this to a template is broken
 	if args.avoid_restriction_sites:
 		constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.avoid_restriction_sites]
 
@@ -232,6 +201,9 @@ def load_user_options(args, location):
 
 	if args.optimize_dicodon_frequency:
 		objectives += [MaximizeDicodonAdaptiveIndex()]
+
+	if args.kmers:
+		objectives += [MinimizeKmerScore(k=args.kmers, boost=args.avoid_kmers_boost, location=location)]
 
 	if args.avoid_secondary_structure:
 		objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_secondary_structure_max_e, location=location, boost=args.avoid_secondary_structure_boost)]
@@ -272,18 +244,17 @@ def insert_into_vector(vector, destination, new_seq):
 def load_inserts(inputs):
 	rec_counter = 1
 	inserts = []
-	chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 	for this_input in inputs: 
 		if os.path.isfile(this_input):
 			ext = os.path.splitext(this_input)[1]
-			if ext == 'fasta':
-				for record in SeqIO.parse(input_filename, 'fasta'):
+			if ext == '.fasta':
+				for record in SeqIO.parse(this_input, 'fasta'):
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 					inserts.append(record)
-			elif exit == 'pdb':
-				for chain_num, record in enumerate(SeqIO.parse(input_pdb, "pdb-atom")):
-					name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
+			elif ext == '.pdb':
+				for chain_num, record in enumerate(SeqIO.parse(this_input, "pdb-atom")):
+					name = os.path.splitext(os.path.basename(this_input))[0] + "_" + record.annotations['chain']
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 					record.id=name
 					record.name=name
@@ -291,7 +262,7 @@ def load_inserts(inputs):
 			else:
 				exit("extension not recognized: " + ext)
 		else:
-			record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
+			record = SeqRecord(Seq(reverse_translate(this_input),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
 			rec_counter += 1
 			inserts.append(record)
 
@@ -339,29 +310,27 @@ def load_inserts(inputs):
 
 	return inserts
 
-
-if __name__ == "__main__":
-
+def parse_user_args():
 	parser=argparse.ArgumentParser(prog='domesticator', description='The coolest codon optimizer on the block')
 
 	parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
 	input_parser = parser.add_argument_group(title="Input Options", description=None)
 	#input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
-	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="Protein sequence(s) or file(s) to be optimized. Valid inputs are full protein sequences and fasta and pdb files. This should be detected automatically")
+	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="*",	help="Protein sequence(s) or file(s) to be optimized. Valid inputs are full protein sequences and fasta and pdb files. This should be detected automatically")
 	#input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_sequence", 	help="Input mode. %(default)s by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
 
 	cloning_parser = parser.add_argument_group(title="Cloning Options", description=None)
 
-	cloning_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="HELP MESSAGE")
+	cloning_parser.add_argument("--vector", "-v", 		dest="vector", 		type=str, 	default=None, 			metavar="pEXAMPLE.gb",		help="Vector used for domesticating a sequence(s) or creating new vectors")
 	#cloning_parser.add_argument("--destination", "-d", 	dest="destination", type=str, 	default="INSERT", 		metavar="NAME",			help="TODO: flesh this out. Matches the dom_destination feature in the vector")
 
+	cloning_parser.add_argument("--create_template", dest="create_template", action="store_true", default=False, help="TODO")
 
 
 	optimizer_parser = parser.add_argument_group(title="Optimizer Options", description="These are only used if a vector is not specified or if create_template is set.")
 	#Optimization Arguments
 	optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh). Turns off all non-critical objectives and constraints")
-	optimizer_parser.add_argument("--create_template", dest="create_template", metavar="path/to/file.gb", default=None, help="Provide this with an output filename and the name of the destination annotation in order to perform no optimization and print a template file with the specified optimization instead.")
 
 	#optimizer options
 	optimizer_parser.add_argument("--species", dest="species", default="e_coli", help="specifies the codon and dicodon bias tables to use. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
@@ -416,24 +385,58 @@ if __name__ == "__main__":
 	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
 	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
-	args = parser.parse_args()
+	return parser.parse_args()
 
-	destination = "INSERT"
+
+
+if __name__ == "__main__":
+
+	args = parse_user_args()
+
+	destination = "DOMESTICATOR_INSERT"
 
 	if args.create_template:
-		placeholder = SeqRecord("cgctatgcgaacaaaattgaactggaacgc", name="INSERT")
-		naive_construct, objectives, constraints = load_template(args.create_template, placeholder, destination)
+
+		
+
+		placeholder = SeqRecord(Seq("cgctatgcgaacaaaattgaactggaacgc", alphabet=IUPAC.unambiguous_dna), name=destination)
+
+
+		if args.vector:
+			base, ext = os.path.splitext(os.path.basename(args.vector))
+			output_filename = base + "_" + destination + ext
+			naive_construct, objectives, constraints = load_template(args.vector, placeholder, destination)
+		else:
+			output_filename = destination + ".gb"
+			objectives = []
+			constraints = []
+			naive_construct = placeholder
+			whole_seq_feat = SeqFeature()
+			whole_seq_feat.type = "misc_feature"
+			whole_seq_feat.qualifiers['label'] = [destination]
+			whole_seq_feat.location = FeatureLocation(0,len(placeholder),strand=1)
+			naive_construct.features.append(whole_seq_feat)
 
 		dest_feat = find_annotation(naive_construct, placeholder.name)
-		dest_loc = dest_feat.location
+		dest_loc = Location.from_biopython_location(dest_feat.location)
+
 
 		user_objectives, user_constraints = load_user_options(args, dest_loc)
+	
 
 		objectives += user_objectives
 		constraints += user_constraints
 
-		print(naive_construct)
-		exit(dest_feat)
+
+		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
+
+		domesticator_record = problem.to_record()
+
+		mature_construct = naive_construct
+		mature_construct.features.extend(domesticator_record.features)
+
+		SeqIO.write([mature_construct], output_filename, "genbank")
+		exit("exported " + output_filename)
 
 
 
@@ -444,12 +447,10 @@ if __name__ == "__main__":
 
 	outputs = []
 
-	
-
 	for insert in inserts:
 		if args.vector:
 
-			args.output_mode = 'none'
+			#args.output_mode = 'none'
 			naive_construct, objectives, constraints = load_template(args.vector, insert, destination)
 		else:
 			#wasn't given a vector
@@ -459,52 +460,55 @@ if __name__ == "__main__":
 
 			location = Location(0, len(insert))
 
-			
-
-			
-
 			objectives, constraints = load_user_options(args, location)
 			
 
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
 
-		if args.create_template:
-			record = problem.to_record()
-			SeqIO.write(record, args.create_template, "genbank")
-			exit()
+		
+		if args.optimize:
+			##optimize
+			problem.resolve_constraints()
+			problem.optimize()
+			problem.resolve_constraints(final_check=True)
 		else:
-			if args.optimize:
-				##optimize
-				problem.resolve_constraints()
-				problem.optimize()
-				problem.resolve_constraints(final_check=True)
+			print(problem.constraints_text_summary())
+			print(problem.objectives_text_summary())
+
+		mature_construct = naive_construct
+		mature_construct.seq = Seq(problem.sequence, alphabet=IUPAC.unambiguous_dna)
+		mature_construct.name = insert.name
+		mature_construct.id = insert.name
+
+		if args.vector:
+			template_basename = os.path.basename(args.vector)
+
+			if destination in template_basename:
+				custom_filename = template_basename.replace(destination, insert.name)
 			else:
-				print(problem.constraints_text_summary())
-				print(problem.objectives_text_summary())
+				base, ext = os.path.splitext(template_basename)
+				custom_filename = base + "_" + insert.name + ext
+			
+			mature_construct.name = os.path.splitext(custom_filename)[0]
+			mature_construct.id = mature_construct.name
+			SeqIO.write([mature_construct], custom_filename, "genbank")
 
-			mature_construct = naive_construct
-			mature_construct.seq = Seq(problem.sequence, alphabet=IUPAC.unambiguous_dna)
+		outputs.append(mature_construct)
 
-			if args.vector:
-				template_basename = os.path.basename(args.vector)
-				custom_filename = template_basename.replace(destination, mature_construct.name)
-				SeqIO.write([mature_construct], custom_filename, "genbank")
+		#take vector name and replace the destination name with the insert name?
 
-			outputs.append(mature_construct)
-
-			#take vector name and replace the destination name with the insert name?
-
-			#does this work right?
-
+		#does this work right?
 
 	#SO ordering... How does ordering work. 
 
 	#REMEMBER to set the description to "" for easy ordering
 	if args.order_type == "gBlocks":
-		SeqIO.write([find_annotation(output, "gBlock_to_order").location.extract(output.seq) for output in outputs], "order.fasta", "fasta")
+		with open("order.fasta", "a+") as order:
+			SeqIO.write([SeqRecord(find_annotation(output, "gBlock_to_order").location.extract(output.seq),id=output.id,name=output.name,description="") for output in outputs], order, "fasta")
 	elif args.order_type == "genes":
 		#simply output the thing having been inserted. 
-		SeqIO.write([find_annotation(output, "gene_to_order").location.extract(output.seq) for output in outputs], "order.fasta", "fasta")
+		with open("order.fasta", "a+") as order:
+			SeqIO.write([SeqRecord(find_annotation(output, "gene_to_order").location.extract(output.seq),id=output.id,name=output.name,description="") for output in outputs], order, "fasta")
 
 
 	#time to handle IO
@@ -515,135 +519,4 @@ if __name__ == "__main__":
 			output.description = ""
 			print(output.format("fasta"))
 	elif args.output_mode:
-		SeqIO.write(mature_construct, args.output_filename, args.output_mode)
-
-
-	exit()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777#
-
-
-print("loading global constraints")
-#load constraints
-
-
-
-global_constraints += [
-				EnforceGCContent(0.4,0.65), #global
-				EnforceGCContent(0.25,0.8,window=50)] #local
-
-
-
-if args.avoid_restriction_sites:
-	print("avoiding:")
-	for enzy in args.avoid_restriction_sites.split(","):
-		print(enzy)
-		global_constraints.append(AvoidPattern(EnzymeSitePattern(enzy)))
-
-print("loading global objectives")
-#load objectives
-if args.avoid_kmers > 0:
-	global_objectives.append(objectives.MinimizeKmerScore(k = args.avoid_kmers, boost = args.kmer_boost))
-if args.is_cds:
-	print("optimizing for:")
-	for species in args.species.split(","):
-		print(species)
-		if args.CAI_lower_bound > 0.0:
-			global_constraints.append(constraints.ConstrainCAI(species=species, minimum=args.CAI_lower_bound))
-		if args.harmonized:
-			global_objectives.append(CodonOptimize(species,mode='harmonized')) #NEEDS LOCATION WITH CDS
-		else:
-			global_objectives.append(CodonOptimize(species,mode='best_codon')) #NEEDS LOCATION WITH CDS
-	#global_objectives.append(CodonOptimize(species=args.species,mode='best_codon')) #NEEDS LOCATION WITH CDS
-
-print("begin optimization")
-#start optimization
-
-
-
-for sr, lc in zip(SeqRecords, local_constraints):
-	print("Optimizing %s" % sr.name)
-	print(len(sr.seq))
-	this_constraints = global_constraints
-	if(lc is not None):
-		this_constraints += lc
-	this_objectives = global_objectives
-
-	print("objectives: %s" % this_objectives)
-	print("constraints: %s" % this_constraints)
-
-	problem = DnaOptimizationProblem(
-		sequence=str(sr.seq),
-		constraints=this_constraints,
-		objectives=this_objectives
-	)
-	
-	#print(problem.sequence)
-	#print ("\nBefore optimization:\n")
-	print (problem.constraints_text_summary(failed_only=True))
-	#print (problem.objectives_text_summary())
-
-
-	#This seems like a great place for GPU calculations
-	problem.resolve_constraints()
-	problem.optimize()
-	problem.resolve_constraints(final_check=True)
-	
-	#print(problem.sequence)
-	if  args.is_cds:
-		original_prot = sr.seq.translate()
-		optimize_prot = Seq(problem.sequence).translate()
-		if(original_prot != optimize_prot):
-			print("protein sequence changed before and after optimization")
-			print(original_prot)
-			print(optimize_prot)
-			exit()
-	print("Old seq: %s" % sr.seq)
-	sr.seq = MutableSeq(problem.sequence, alphabet=IUPAC.unambiguous_dna)
-	print("New seq: %s" % sr.seq)
-	#print ("\nAfter optimization:\n")
-	print (problem.constraints_text_summary(failed_only=True))
-	
-	#do something else if it's failed!
-	#print (problem.objectives_text_summary())
-print("finish optimization")
-print("outputting")
-
-outname = args.output_filename
-
-args.output_mode = args.output_mode.strip().lower()
-
-#outext = ""
-#TODO this is messy. Use BioPython's built in type checker and just clean up input a bit (lower case, etc). Catch errors and then default to terminal.
-if args.output_mode == "fasta":
-	if outname is None:
-		outname = "gblocks.fasta"
-	#outext = ".fasta"
-	for sr in SeqRecords:
-		with open(outname, 'w') as f:
-			f.write(sr.format("fasta"))
-elif args.output_mode == "genbank":
-	if outname is None:
-		outname = "gblocks.gb"
-	#outext = ".gb"
-	sys.exit("not implemented")
-else:
-	if args.output_mode != "print":
-		print("output mode not recognized")
-	print("Printing to terminal")
-	for sr in SeqRecords:
-		print(sr.format("fasta"))
+		SeqIO.write(outputs, args.output_filename, args.output_mode)
