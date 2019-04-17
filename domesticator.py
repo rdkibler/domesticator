@@ -25,8 +25,6 @@ from constraints import ConstrainCAI
 from objectives import MinimizeSecondaryStructure, MinimizeKmerScore
 import os
 
-
-
 def load_template(filename, insert, destination):
 	''' func descriptor '''
 
@@ -167,8 +165,11 @@ def load_user_options(args, location):
 	else:
 		opt_mode = 'best_codon'
 	objectives += [
-		CodonOptimize(species=args.species, location=location, mode=opt_mode), 
-		EnforceTranslation(location=location)]
+		CodonOptimize(species=args.species, location=location, mode=opt_mode)
+	]
+	constraints += [
+		EnforceTranslation(location=location)
+	]
 
 	if args.avoid_homopolymers:
 		constraints += [
