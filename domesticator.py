@@ -242,6 +242,8 @@ def insert_into_vector(vector, destination, new_seq):
 
 	return vector, insert_loc
 
+
+
 def load_inserts(inputs):
 	rec_counter = 1
 	inserts = []
@@ -251,7 +253,9 @@ def load_inserts(inputs):
 			ext = os.path.splitext(this_input)[1]
 			if ext == '.fasta':
 				for record in SeqIO.parse(this_input, 'fasta'):
+					orig_aa_seq = record.seq
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+					assert(orig_aa_seq == translation(record.seq))
 					inserts.append(record)
 			elif ext == '.pdb':
 				records = list(SeqIO.parse(this_input, "pdb-atom"))
@@ -268,6 +272,7 @@ def load_inserts(inputs):
 						record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 						record.id=name
 						record.name=name
+						print(name)
 						inserts.append(record)
 			else:
 				exit("extension not recognized: " + ext)
@@ -527,4 +532,6 @@ if __name__ == "__main__":
 			output.description = ""
 			print(output.format("fasta"))
 	elif args.output_mode:
+		for output in outputs:
+			output.description = ""
 		SeqIO.write(outputs, args.output_filename, args.output_mode)
