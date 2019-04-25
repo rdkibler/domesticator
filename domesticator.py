@@ -254,8 +254,9 @@ def load_inserts(inputs):
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 					inserts.append(record)
 			elif ext == '.pdb':
-				records = SeqIO.parse(this_input, "pdb-atom")
+				records = list(SeqIO.parse(this_input, "pdb-atom"))
 				if len(records) == 1:
+					record = records[0]
 					name = os.path.splitext(os.path.basename(this_input))[0]
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 					record.id=name
