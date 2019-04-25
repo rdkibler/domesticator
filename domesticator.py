@@ -1,4 +1,4 @@
-#!/home/rdkibler/.conda/envs/domesticator/bin/python
+#!/home/rdkibler/.conda/envs/domesticator/bin/python3
 
 ##also look into pytest
 import sys
@@ -254,7 +254,15 @@ def load_inserts(inputs):
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 					inserts.append(record)
 			elif ext == '.pdb':
-				for chain_num, record in enumerate(SeqIO.parse(this_input, "pdb-atom")):
+				records = SeqIO.parse(this_input, "pdb-atom")
+				if len(records) == 1:
+					name = os.path.splitext(os.path.basename(this_input))[0]
+					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+					record.id=name
+					record.name=name
+					inserts.append(record)
+				else:
+					for record in records:
 					name = os.path.splitext(os.path.basename(this_input))[0] + "_" + record.annotations['chain']
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
 					record.id=name
