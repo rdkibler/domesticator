@@ -263,11 +263,11 @@ def load_inserts(inputs):
 					inserts.append(record)
 				else:
 					for record in records:
-					name = os.path.splitext(os.path.basename(this_input))[0] + "_" + record.annotations['chain']
-					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-					record.id=name
-					record.name=name
-					inserts.append(record)
+						name = os.path.splitext(os.path.basename(this_input))[0] + "_" + record.annotations['chain']
+						record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+						record.id=name
+						record.name=name
+						inserts.append(record)
 			else:
 				exit("extension not recognized: " + ext)
 		else:
@@ -470,10 +470,8 @@ if __name__ == "__main__":
 			location = Location(0, len(insert))
 
 			objectives, constraints = load_user_options(args, location)
-			
 
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
-
 		
 		if args.optimize:
 			##optimize
