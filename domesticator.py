@@ -9,7 +9,7 @@ sys.path.insert(0, database)
 #import json
 from collections import Counter
 #from dnachisel import *
-from dnachisel import EnforceTranslation, AvoidChanges, DnaOptimizationProblem, CodonOptimize, AvoidPattern, HomopolymerPattern, EnzymeSitePattern, EnforceGCContent, EnforceTerminalGCContent, AvoidHairpins
+from dnachisel import EnforceTranslation, AvoidChanges, DnaOptimizationProblem, CodonOptimize, AvoidPattern, HomopolymerPattern, EnzymeSitePattern, EnforceGCContent, EnforceTerminalGCContent, AvoidHairpins, NoSolutionError
 from dnachisel import Location
 from dnachisel import reverse_translate
 import argparse
@@ -255,21 +255,25 @@ def load_inserts(inputs):
 				for record in SeqIO.parse(this_input, 'fasta'):
 					orig_aa_seq = record.seq
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-					assert(orig_aa_seq == translation(record.seq))
+					assert(orig_aa_seq == record.seq.translate())
 					inserts.append(record)
 			elif ext == '.pdb':
 				records = list(SeqIO.parse(this_input, "pdb-atom"))
 				if len(records) == 1:
 					record = records[0]
 					name = os.path.splitext(os.path.basename(this_input))[0]
+					orig_aa_seq = record.seq
 					record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+					assert(orig_aa_seq == record.seq.translate())
 					record.id=name
 					record.name=name
 					inserts.append(record)
 				else:
 					for record in records:
 						name = os.path.splitext(os.path.basename(this_input))[0] + "_" + record.annotations['chain']
+						orig_aa_seq = record.seq
 						record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
+						assert(orig_aa_seq == record.seq.translate())
 						record.id=name
 						record.name=name
 						print(name)
@@ -477,13 +481,22 @@ if __name__ == "__main__":
 
 			objectives, constraints = load_user_options(args, location)
 
+		print("DO NOT USE UNTIL I ADD AN ASSERT STATEMENT WHICH CONTROLS FOR CORRECT TRANSLATION")
+
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
 		
 		if args.optimize:
 			##optimize
-			problem.resolve_constraints()
-			problem.optimize()
-			problem.resolve_constraints(final_check=True)
+			try:
+				problem.resolve_constraints()
+				problem.optimize()
+				problem.resolve_constraints(final_check=True)
+			except NoSolutionError:
+				problem.max_random_iters = 20000
+				problem.resolve_constraints()
+				problem.optimize()
+				problem.resolve_constraints(final_check=True)
+
 		else:
 			print(problem.constraints_text_summary())
 			print(problem.objectives_text_summary())
