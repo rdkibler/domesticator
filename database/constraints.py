@@ -65,7 +65,7 @@ class ConstrainCAI(Specification):
 
 
 	def __init__(self, species, location, minimum):
-		raise NotImplementedError("ConstrainCAI not implmented")
+		#raise NotImplementedError("ConstrainCAI not implmented")
 		self.location = location
 		self.minimum = minimum
 		self.species = species
