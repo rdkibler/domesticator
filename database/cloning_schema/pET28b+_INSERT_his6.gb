@@ -1,6 +1,6 @@
 LOCUS       pET28b+_INSERT1_his6    5368 bp ds-DNA     circular     19-MAR-2019
 DEFINITION  .
-KEYWORDS    "Test:val"                                                         
+KEYWORDS    "constraints:EnforceGCContent(0.4,0.65)|EnforceGCContent(0.25,0.8,window=50)|AvoidPattern(homopolymer_pattern('A',6))|AvoidPattern(homopolymer_pattern('T',6))|AvoidPattern(homopolymer_pattern('C',6))|AvoidPattern(homopolymer_pattern('G',6))" "objectives:MinimizeKmerScore(9,boost=5)|CodonOptimize('e_coli',mode='best_codon')"                                                       
 FEATURES             Location/Qualifiers
      rep_origin           1866..2485
                           /label="pBR322_origin"

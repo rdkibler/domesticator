@@ -24,6 +24,17 @@ from Bio.Alphabet import IUPAC
 from constraints import ConstrainCAI
 from objectives import MinimizeSecondaryStructure, MinimizeKmerScore
 import os
+import copy
+
+from dnachisel.DnaOptimizationProblem import DEFAULT_SPECIFICATIONS_DICT
+
+
+CUSTOM_SPECIFICATIONS_DICT = copy.deepcopy(DEFAULT_SPECIFICATIONS_DICT)
+CUSTOM_SPECIFICATIONS_DICT.update({
+    'ConstrainCAI': ConstrainCAI,
+    'MinimizeSecondaryStructure': MinimizeSecondaryStructure,
+    'MinimizeKmerScore': MinimizeKmerScore
+})
 
 def load_template(filename, insert, destination):
 	''' func descriptor '''
@@ -36,7 +47,7 @@ def load_template(filename, insert, destination):
 
 	vector, insert_location = insert_into_vector(vector, destination, insert)
 
-	problem = DnaOptimizationProblem.from_record(vector)
+	problem = DnaOptimizationProblem.from_record(vector, specifications_dict=CUSTOM_SPECIFICATIONS_DICT)
 	constraints += problem.constraints
 	objectives += problem.objectives
 
@@ -52,7 +63,7 @@ def load_template(filename, insert, destination):
 
 
 	#This seq should be a SeqRecord object
-	return vector, objectives, constraints
+	return vector, objectives, constraints, insert_location
 
 def replace_sequence_in_record(record, location, new_seq):
 	#print(record, location, new_seq)
@@ -153,9 +164,16 @@ def replace_sequence_in_record(record, location, new_seq):
 
 	return record
 
-def load_user_options(args, location):
+def load_user_options(args, f_location):
 
-	assert(isinstance(location, Location))
+	#assert(isinstance(f_location, FeatureLocation))
+
+	#I need location variable to be the dna_chisel version
+	if isinstance(f_location, FeatureLocation):
+		location = Location.from_biopython_location(f_location) #to dna_chisel
+	else:
+		location = f_location
+
 	#set enforce translation to the whole thing
 	constraints = []
 	objectives = []
@@ -423,8 +441,12 @@ if __name__ == "__main__":
 
 		if args.vector:
 			base, ext = os.path.splitext(os.path.basename(args.vector))
-			output_filename = base + "_" + destination + ext
-			naive_construct, objectives, constraints = load_template(args.vector, placeholder, destination)
+
+			if destination in base:
+				output_filename = base + ext
+			else:
+				output_filename = base + "_" + destination + ext
+			naive_construct, objectives, constraints, insert_location = load_template(args.vector, placeholder, destination)
 		else:
 			output_filename = destination + ".gb"
 			objectives = []
@@ -446,7 +468,6 @@ if __name__ == "__main__":
 		objectives += user_objectives
 		constraints += user_constraints
 
-
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
 
 		domesticator_record = problem.to_record()
@@ -455,6 +476,7 @@ if __name__ == "__main__":
 		mature_construct.features.extend(domesticator_record.features)
 
 		SeqIO.write([mature_construct], output_filename, "genbank")
+		#BAD BAD
 		exit("exported " + output_filename)
 
 
@@ -470,41 +492,57 @@ if __name__ == "__main__":
 		if args.vector:
 
 			#args.output_mode = 'none'
-			naive_construct, objectives, constraints = load_template(args.vector, insert, destination)
+			naive_construct, objectives, constraints, insert_location= load_template(args.vector, insert, destination)
 		else:
 			#wasn't given a vector
 			naive_construct = insert
 			objectives = []
 			constraints = []
 
-			location = Location(0, len(insert))
+			#insert_location = Location(0, len(insert))
+			insert_location = FeatureLocation(0, len(insert))
 
-			objectives, constraints = load_user_options(args, location)
+			objectives, constraints = load_user_options(args, insert_location)
 
-		print("DO NOT USE UNTIL I ADD AN ASSERT STATEMENT WHICH CONTROLS FOR CORRECT TRANSLATION")
-
+		before_aa = insert_location.extract(naive_construct.seq).translate()
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
-		
+
 		if args.optimize:
 			##optimize
-			try:
-				problem.resolve_constraints()
-				problem.optimize()
-				problem.resolve_constraints(final_check=True)
-			except NoSolutionError:
-				problem.max_random_iters = 20000
-				problem.resolve_constraints()
-				problem.optimize()
-				problem.resolve_constraints(final_check=True)
+			try_num = 0
+			max_tries = 1
+			while True:
+				try:
+					print("attempting optimization of " + naive_construct.name)
+					problem.resolve_constraints()
+					problem.optimize()
+					problem.resolve_constraints(final_check=True)
+					break
+				except NoSolutionError:
+					try_num += 1
+					if try_num < max_tries:
+						problem.max_random_iters += 1000
+						print(problem.constraints_text_summary())
+						print(problem.objectives_text_summary())
+						print("optimization of %s failed! Attempt %d of %d. Trying again with %d random iters" % (naive_construct.name, try_num + 1, max_tries, problem.max_random_iters))
+					else:
+						print("optimization of %s failed!" % (naive_construct.name))
+						#problem.sequence = ""
+						break
 
-		else:
-			print(problem.constraints_text_summary())
-			print(problem.objectives_text_summary())
+
+		print(problem.constraints_text_summary())
+		print(problem.objectives_text_summary())
 
 		mature_construct = naive_construct
 		mature_construct.seq = Seq(problem.sequence, alphabet=IUPAC.unambiguous_dna)
 		mature_construct.name = insert.name
 		mature_construct.id = insert.name
+
+		after_aa = insert_location.extract(mature_construct.seq).translate()
+
+		#print(before_aa, after_aa)
+		assert(before_aa == after_aa)
 
 		if args.vector:
 			template_basename = os.path.basename(args.vector)
@@ -514,7 +552,7 @@ if __name__ == "__main__":
 			else:
 				base, ext = os.path.splitext(template_basename)
 				custom_filename = base + "_" + insert.name + ext
-			
+
 			mature_construct.name = os.path.splitext(custom_filename)[0]
 			mature_construct.id = mature_construct.name
 			SeqIO.write([mature_construct], custom_filename, "genbank")
