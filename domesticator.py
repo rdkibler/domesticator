@@ -362,13 +362,8 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--optimize_dicodon_frequency", type=bool, default=False, help="TODO")
 
-	optimizer_parser.add_argument("--avoid_secondary_structure", type=bool, default=False, help="TODO")
-	optimizer_parser.add_argument("--avoid_secondary_structure_max_e", type=float, default=-5.0, help="TODO")
-	optimizer_parser.add_argument("--avoid_secondary_structure_boost", type=float, default=1.0, help="TODO. Has no effect if --avoid_secondary_structure is not set")
-
-	optimizer_parser.add_argument("--avoid_initiator_secondary_structure", type=bool, default=False, help="TODO")
-	optimizer_parser.add_argument("--avoid_initiator_secondary_structure_max_e", type=bool, default=-5.0, help="TODO")
-	optimizer_parser.add_argument("--avoid_initiator_secondary_structure_boost", type=float, default=5.0, help="TODO. Has no effect if --avoid_5'_secondary_structure is not set")
+	optimizer_parser.add_argument("--minimize_mRNA_stability", type=bool, default=False, help="Use ViennaRNA to identify hairpin-forming locations above a certain stability and optimize them away")
+	optimizer_parser.add_argument("--minimize_mRNA_stability_boost", type=float, default=False, help="Weight boost to minimize_mRNA_stability objective")
 
 
 	ordering_parser = parser.add_argument_group(title="Ordering Options", description=None)

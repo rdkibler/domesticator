@@ -4,6 +4,7 @@ from collections import Counter
 from CAI import CAI
 import json
 from dnachisel.Location import Location
+import RNA
 
 
 class MinimizeKmerScore(Specification):
