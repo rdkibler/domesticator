@@ -303,48 +303,6 @@ def load_inserts(inputs):
 			rec_counter += 1
 			inserts.append(record)
 
-
-	# if mode == "protein_fasta_file":
-	# 	for input_filename in inputs:
-	# 		for record in SeqIO.parse(input_filename, 'fasta'):
-	# 			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-	# 			inserts.append(record)
-	# # elif mode == "DNA_fasta_file":
-	# 	for input_filename in inputs:
-	# 		for record in SeqIO.parse(input_filename, 'fasta'):
-	# 			assert(len(record.seq) % 3 == 0)
-	# 			record.seq = Seq(str(record.seq), IUPAC.unambiguous_dna)
-	# 			inserts.append(record)
-	# elif mode == "protein_sequence":
-	# 	for input_sequence in inputs:
-	# 		record = SeqRecord(Seq(reverse_translate(input_sequence),IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
-	# 		rec_counter += 1
-	# 		inserts.append(record)
-
-	# elif mode == "DNA_sequence":
-	# 	for input_sequence in inputs:
-	# 		record = SeqRecord(Seq(input_sequence,IUPAC.unambiguous_dna), id="unknown_seq%d" % rec_counter, name="unknown_seq%d" % rec_counter, description="domesticator-optimized DNA sequence")
-	# 		rec_counter += 1
-	# 		inserts.append(record)
-
-	# elif mode == "PDB":
-	# 	chain="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	# 	#parser = PDBParser()
-	# 	#ppb=PPBuilder()
-	# 	for input_pdb in inputs:
-	# 		#for chain_num, polypeptide in enumerate(ppb.build_peptides(parser.get_structure('name', input_pdb))):
-	# 		for chain_num, record in enumerate(SeqIO.parse(input_pdb, "pdb-atom")):
-	# 			#seq = Seq(reverse_translate(polypeptide.get_sequence()), IUPAC.unambiguous_dna)
-	# 			name = os.path.splitext(os.path.basename(input_pdb))[0] + "_" + chain[chain_num]
-	# 			#record = SeqRecord(seq, id=name, name=name, description="domesticator-optimized DNA sequence")
-
-	# 			record.seq = Seq(reverse_translate(record.seq), IUPAC.unambiguous_dna)
-	# 			record.id=name
-	# 			record.name=name
-	# 			inserts.append(record)
-	# else:
-	# 	exit("input mode not recognized: " + args.input_mode)
-
 	return inserts
 
 def parse_user_args():
