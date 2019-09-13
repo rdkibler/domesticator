@@ -224,11 +224,8 @@ def load_user_options(args, f_location):
 	if args.kmers:
 		objectives += [MinimizeKmerScore(k=args.kmers, boost=args.avoid_kmers_boost, location=location)]
 
-	if args.avoid_secondary_structure:
-		objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_secondary_structure_max_e, location=location, boost=args.avoid_secondary_structure_boost)]
-
-	if args.avoid_initiator_secondary_structure:
-		objectives += [MinimizeSecondaryStructure(max_energy=args.avoid_initiator_secondary_structure_max_e, location=location, optimize_initiator=True, boost=args.avoid_initiator_secondary_structure_boost)]
+	if args.minimize_mRNA_stability:
+		objectives += [MinimizeSecondaryStructure(max_energy=args.minimize_mRNA_stability_max_e, location=location, boost=args.minimize_mRNA_stability_boost)]
 
 	return objectives, constraints
 
@@ -306,13 +303,15 @@ def load_inserts(inputs):
 	return inserts
 
 def parse_user_args():
-	parser=argparse.ArgumentParser(prog='domesticator', description='The coolest codon optimizer on the block')
+	parser=argparse.ArgumentParser(prog='domesticator', description='This is a wrapper and extension of the DnaChisel library (https://github.com/Edinburgh-Genome-Foundry/DnaChisel). Default usage \
+		should be optimal for general Baker Lab usage for recombinant E. coli over expression. Simply run domesticator.py path/to/protein/fasta/sequence. Recommended usage for Yeast codon optimization \
+		is the following: domesticator.py path/to/protein/fasta/sequence')
 
 	parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
 	input_parser = parser.add_argument_group(title="Input Options", description=None)
 	#input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
-	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="*",	help="Protein sequence(s) or file(s) to be optimized. Valid inputs are full protein sequences and fasta and pdb files. This should be detected automatically")
+	input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="*",	help="Protein sequence(s) or file(s) to be optimized. Valid inputs are plaintext protein sequences (e.g. MSAWNQL...), fasta files (e.g. RK5A.fasta), and pdb files (e.g. RK5A.pdb). The type is detected automatically")
 	#input_parser.add_argument("--input_mode", 			dest="input_mode", 	type=str, 	default="protein_sequence", 	help="Input mode. %(default)s by default.", choices=["PDB", "DNA_fasta_file", "protein_fasta_file", "DNA_sequence", "protein_sequence"])
 
 	cloning_parser = parser.add_argument_group(title="Cloning Options", description=None)
@@ -334,14 +333,14 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", type=bool, default=True, help="Removes hairpins according to IDT's definition of a hairpin. A quicker and dirtier alternative to avoid_secondary_structure. Default to %(default)s")
 
-	optimizer_parser.add_argument("--avoid_kmers", dest="kmers", metavar="k", default=9, type=int, help="Repeated sequences can complicate gene synthesis. This prevents repeated sequences of length k. Set to 0 to turn off. Default to %(default)d")
-	optimizer_parser.add_argument("--avoid_kmers_boost", dest="avoid_kmers_boost", type=float, default=1.0, help="Give a multiplier to the avoid_kmers term. Default to %(default)f")
+	optimizer_parser.add_argument("--avoid_kmers", dest="kmers", metavar="k", default=8, type=int, help="Repeated sequences can complicate gene synthesis. This prevents repeated sequences of length k. Set to 0 to turn off. Default to %(default)d")
+	optimizer_parser.add_argument("--avoid_kmers_boost", dest="avoid_kmers_boost", type=float, default=10.0, help="Give a multiplier to the avoid_kmers term. Default to %(default)f")
 
 	optimizer_parser.add_argument("--avoid_homopolymers", dest="avoid_homopolymers", metavar="len", default=6, type=int, help="homopolymers can complicate synthesis. Prevent homopolymers longer than %(default)d by default. Specify a different length with this option. Set to 0 to turn off")
 
-	optimizer_parser.add_argument("--avoid_patterns", dest="avoid_patterns", nargs="*", metavar="SEQUENCES", help="DNA sequence patterns to avoid", type=str)
+	optimizer_parser.add_argument("--avoid_patterns", dest="avoid_patterns", nargs="*", default=["AAGAAG","TAAGGAG","GCTGGTGG","ATCTGTT","GRGGT","MAGGTRAG","YYYYNTAGG"], metavar="SEQUENCES", help="DNA sequence patterns to avoid", type=str)
 
-	optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="Enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII", nargs="*", metavar="enzy", type=str)
+	optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", default=["NdeI","XhoI"], help="Enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII", nargs="*", metavar="enzy", type=str)
 
 	optimizer_parser.add_argument("--constrain_global_GC_content", type=bool, default=True, help="TODO")
 	optimizer_parser.add_argument("--global_GC_content_min", type=float, default=0.4, help="TODO")
@@ -362,8 +361,14 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--optimize_dicodon_frequency", type=bool, default=False, help="TODO")
 
-	optimizer_parser.add_argument("--minimize_mRNA_stability", type=bool, default=False, help="Use ViennaRNA to identify hairpin-forming locations above a certain stability and optimize them away")
-	optimizer_parser.add_argument("--minimize_mRNA_stability_boost", type=float, default=False, help="Weight boost to minimize_mRNA_stability objective")
+	optimizer_parser.add_argument("--minimize_mRNA_stability", action="store_true", default=False, help="Use ViennaRNA to identify hairpin-forming locations above a certain stability and optimize them away. Use with caution. It's very slow!")
+	optimizer_parser.add_argument("--minimize_mRNA_stability_max_e", type=float, default=1.0, help="Energy threshold of hairpin")
+	optimizer_parser.add_argument("--minimize_mRNA_stability_boost", type=float, default=1.0, help="Weight boost to minimize_mRNA_stability objective")
+
+	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability", action="store_true", default=False, help="Use ViennaRNA to identify hairpin-forming locations above a certain stability in the initiator region and optimize them away. Use with caution. It's very slow! Though not as slow as running it on the whole sequence.")
+	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability_max_e", type=float, default=1.0, help="Energy threshold of hairpin")
+	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability_location", type=str, default="0-60")
+	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability_boost", type=float, default=1.0, help="Weight boost to minimize_mRNA_stability objective")
 
 
 	ordering_parser = parser.add_argument_group(title="Ordering Options", description=None)
@@ -372,7 +377,7 @@ def parse_user_args():
 
 	output_parser = parser.add_argument_group(title="Output Options", description=None)
 	#Output Arguments
-	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
+	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export optimized sequences")
 	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
 	return parser.parse_args()

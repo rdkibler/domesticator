@@ -4,7 +4,6 @@ from collections import Counter
 from CAI import CAI
 import json
 from dnachisel.Location import Location
-import RNA
 
 
 class MinimizeKmerScore(Specification):
@@ -178,6 +177,7 @@ class MinimizeSecondaryStructure(Specification):
 		mfe = fc.mfe_window_cb(mfe_window_callback, hairpins)
 
 		message = "overall mfe: %0.2f kcal/mol; num violations: %d" % (mfe, len(hairpins))
+		print(message)
 		
 		#locations are defined by lists of the start and stop of the segment with the problem
 		hairpin_locations = [(hp['start'], hp['end']) for hp in hairpins]
@@ -199,3 +199,4 @@ class MinimizeSecondaryStructure(Specification):
 
 	def __str__(self):
 		return "MinimizeSecondaryStructure"
+
