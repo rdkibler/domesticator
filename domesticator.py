@@ -227,6 +227,10 @@ def load_user_options(args, f_location):
 	if args.minimize_mRNA_stability:
 		objectives += [MinimizeSecondaryStructure(max_energy=args.minimize_mRNA_stability_max_e, location=location, boost=args.minimize_mRNA_stability_boost)]
 
+	if args.minimize_mRNA_initiator_stability:
+		#TODO if there's a plasmid, set the initiator to include a little bit before the start, too
+		objectives += [MinimizeSecondaryStructure(max_energy=args.minimize_mRNA_initiator_stability_max_e, location=Location(location.start,location.start+30), boost=args.minimize_mRNA_initiator_stability_boost)]
+
 	return objectives, constraints
 
 def find_annotation(record, label):
@@ -367,7 +371,6 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability", action="store_true", default=False, help="Use ViennaRNA to identify hairpin-forming locations above a certain stability in the initiator region and optimize them away. Use with caution. It's very slow! Though not as slow as running it on the whole sequence.")
 	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability_max_e", type=float, default=1.0, help="Energy threshold of hairpin")
-	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability_location", type=str, default="0-60")
 	optimizer_parser.add_argument("--minimize_mRNA_initiator_stability_boost", type=float, default=1.0, help="Weight boost to minimize_mRNA_stability objective")
 
 
