@@ -13,8 +13,41 @@ class ConstrainComplexity(Specification):
         def __init__(self, max_score=10, location=None, verbose=True):
                 self.location = location
                 self.max_score = max_score
+                self.verbose = verbose
+                self.call_counter = 0
                 user_info = idt.get_user_info(idt.user_info_file)
                 self.token = idt.get_token(idt.token_file, user_info, verbose)
+
+        def evaluate(self, problem):
+                self.call_counter += 1
+                print(f"ConstrainComplexity Call \#{self.call_counter}!")
+                response = query_complexity(seq,self.token["access_token"])
+                if len(response[0]) == 0:
+                        message = "no issue!"
+
+                locations = []
+
+                for issue in response[0]:
+                        vprint(issue,self.verbose)
+                        print(issue["Score"],issue["Name"])
+                        locations.append(None)
+                        score += issue["Score"]
+                print(f"Total Score: {score_sum}")
+
+
+                if score < self.max_score:
+                        message = f"Passed. Complexity score {score} is within OK"
+                else:
+                        message = f"Failed. Complexity score {score} is greater than {self.max_score}"
+
+                return SpecEvaluation(
+                        self, problem,
+                        score=-score,
+                        locations=locations,
+                        message=message
+                )
+
+
 
 
 

@@ -222,3 +222,33 @@ Accepted - Moderate Complexity (Scores between 7 and 19)
 
 Some complexities exist that may interfere with or delay manufacturing. If it is possible to reduce these complexities please do so, otherwise we will attempt this order.
 """
+
+
+
+
+"""
+ForwardLocations is a list of problem locations fwd. I believe these are zero index
+ReverseLocations is a list of problem locations rev. I believe these are zero index
+RepeatedSegment has the problem sequence (just need the length from this)
+
+things with lists:
+SSA Repeat 3
+SSA Repeat 5
+Pseudo Terminal Repeat
+Single Repeat Percentage
+Single Repeat Overall Bases
+Repeat Length
+
+
+
+things with other stuff:
+Overall Repeat (might have to parse msg?)
+
+
+StartIndex has the start (duH)
+Not sure how to determine stopping point unless parse msg
+
+things with index
+Windowed Repeat Percentage
+
+"""
