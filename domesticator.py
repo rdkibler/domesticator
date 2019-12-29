@@ -209,14 +209,16 @@ def load_user_options(args, f_location):
 	if args.avoid_restriction_sites:
 		constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.avoid_restriction_sites]
 
-	if args.constrain_global_GC_content:
-		constraints += [EnforceGCContent(mini=args.global_GC_content_min, maxi=args.global_GC_content_max, location=location)]
+	#if args.constrain_global_GC_content:
+	global_GC_min, global_GC_max = args.global_GC
+	constraints += [EnforceGCContent(mini=global_GC_min, maxi=global_GC_max, location=location)]
 
-	if args.constrain_local_GC_content:
-		constraints += [EnforceGCContent(mini=args.local_GC_content_min, maxi=args.global_GC_content_max, window=args.local_GC_content_window, location=location)]
+	#if args.constrain_local_GC_content:
+	local_GC_min, local_GC_max, local_GC_window = args.local_GC
+	constraints += [EnforceGCContent(mini=local_GC_min, maxi=local_GC_max, window=local_GC_window, location=location)]
 
-	if args.constrain_terminal_GC_content:
-		constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
+	#if args.constrain_terminal_GC_content:
+	#	constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
 
 	#if args.constrain_CAI:
 	#	constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
@@ -309,7 +311,7 @@ def load_inserts(inputs):
 def parse_user_args():
 	parser=argparse.ArgumentParser(prog='domesticator', description='The coolest codon optimizer on the block')
 
-	parser.add_argument('--version', action='version', version='%(prog)s 0.3')
+	parser.add_argument('--version', action='version', version='%(prog)s 0.5')
 
 	input_parser = parser.add_argument_group(title="Input Options", description=None)
 	#input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
@@ -344,19 +346,8 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="Enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII", nargs="*", metavar="enzy", type=str)
 
-	optimizer_parser.add_argument("--constrain_global_GC_content", type=bool, default=True, help="TODO")
-	optimizer_parser.add_argument("--global_GC_content_min", type=float, default=0.4, help="TODO")
-	optimizer_parser.add_argument("--global_GC_content_max", type=float, default=0.65, help="TODO")
-
-	optimizer_parser.add_argument("--constrain_local_GC_content", type=bool, default=True, help="TODO")
-	optimizer_parser.add_argument("--local_GC_content_min", type=float, default=0.25, help="TODO")
-	optimizer_parser.add_argument("--local_GC_content_max", type=float, default=0.8, help="TODO")
-	optimizer_parser.add_argument("--local_GC_content_window", type=int, default=50, help="TODO")
-
-	optimizer_parser.add_argument("--constrain_terminal_GC_content", type=bool, default=False, help="TODO")
-	optimizer_parser.add_argument("--terminal_GC_content_min", type=float, default=0.5, help="TODO")
-	optimizer_parser.add_argument("--terminal_GC_content_max", type=float, default=0.9, help="TODO")
-	optimizer_parser.add_argument("--terminal_GC_content_window", type=int, default=16, help="TODO")
+	optimizer_parser.add_argument("--constrain_global_GC_content", nargs=2, default=[0.4,0.65], dest="global_GC", metavar=['min','max'], help="Constrain the global GC content of the optimized sequence.")
+	optimizer_parser.add_argument("--constrain_local_GC_content", nargs=3, default=[0.25,0.8,50], dest="local_GC", metavar=('min','max','window'), help="Constrain the local GC content of the optimized sequence.")
 
 	#optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
 	#optimizer_parser.add_argument("--constrain_CAI_minimum", type=float, default=0.8, help="TODO")
@@ -374,7 +365,6 @@ def parse_user_args():
 
 	ordering_parser = parser.add_argument_group(title="Ordering Options", description=None)
 	ordering_parser.add_argument("--order_type", choices=["gBlocks","genes"], default=None, help="Choose how you'll order your sequences through IDT and you'll get a file called to_order.fasta that you can directly submit")
-
 
 	output_parser = parser.add_argument_group(title="Output Options", description=None)
 	#Output Arguments
