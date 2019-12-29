@@ -1,15 +1,17 @@
-#!/home/rdkibler/.conda/envs/domesticator/bin/python3
+#!/home/rdkibler/.conda/envs/domesticator_py36/bin/python3
 
 ##also look into pytest
 import sys
+import os
 
-database='/home/rdkibler/projects/domesticator/database/'
+script_dir = os.path.dirname(os.path.realpath(__file__))
+database=os.path.join(script_dir,'database')
 sys.path.insert(0, database)
 
 #import json
 from collections import Counter
 #from dnachisel import *
-from dnachisel import EnforceTranslation, AvoidChanges, DnaOptimizationProblem, CodonOptimize, AvoidPattern, HomopolymerPattern, EnzymeSitePattern, EnforceGCContent, EnforceTerminalGCContent, AvoidHairpins, NoSolutionError
+from dnachisel import EnforceTranslation, AvoidChanges, DnaOptimizationProblem, CodonOptimize, AvoidPattern, HomopolymerPattern, EnzymeSitePattern, EnforceGCContent, EnforceTerminalGCContent, AvoidHairpins, NoSolutionError, MaximizeCAI, AvoidRareCodons
 from dnachisel import Location
 from dnachisel import reverse_translate
 import argparse
@@ -20,20 +22,20 @@ from Bio.Seq import MutableSeq, Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.Alphabet import IUPAC
-#from Bio.PDB import PDBParser, PPBuilder
-from constraints import ConstrainCAI
-from objectives import MinimizeSecondaryStructure, MinimizeKmerScore
+#from constraints import ConstrainCAI
+from objectives import MinimizeSecondaryStructure, MinimizeKmerScore, MaximizeDicodonAdaptiveIndex
 import os
 import copy
 
-from dnachisel.DnaOptimizationProblem import DEFAULT_SPECIFICATIONS_DICT
+from dnachisel import DEFAULT_SPECIFICATIONS_DICT
 
 
 CUSTOM_SPECIFICATIONS_DICT = copy.deepcopy(DEFAULT_SPECIFICATIONS_DICT)
 CUSTOM_SPECIFICATIONS_DICT.update({
-    'ConstrainCAI': ConstrainCAI,
+#    'ConstrainCAI': ConstrainCAI,
     'MinimizeSecondaryStructure': MinimizeSecondaryStructure,
-    'MinimizeKmerScore': MinimizeKmerScore
+    'MinimizeKmerScore': MinimizeKmerScore,
+    'MaximizeDicodonAdaptiveIndex' : MaximizeDicodonAdaptiveIndex
 })
 
 def load_template(filename, insert, destination):
@@ -76,11 +78,7 @@ def replace_sequence_in_record(record, location, new_seq):
 	else:
 		adjusted_seq = record.seq[:location.start] + new_seq.reverse_complement().seq + record.seq[location.end:]
 
-	#exit(adjusted_seq)
 	record.seq = adjusted_seq
-
-	#print(help(location))
-	#exit(dir(location))
 
 	seq_diff = len(new_seq) - len(location)
 	orig_start = location.start
@@ -178,13 +176,18 @@ def load_user_options(args, f_location):
 	constraints = []
 	objectives = []
 
-	if args.harmonized:
-		opt_mode = 'harmonized'
+	if args.codon_optimization_mode == "CAI":
+		objectives += [MaximizeCAI(species=args.species, location=location,boost=args.codon_optimization_boost)]
+	elif args.codon_optimization_mode == "Harmonize":
+		objectives += [MatchTargetCodonUsage(species=args.species, location=location,boost=args.codon_optimization_boost)]
+	elif args.codon_optimization_mode == "Robby":
+		objectives += [AvoidRareCodons(min_frequency=0.1,species=args.species, location=location,boost=args.codon_optimization_boost)]
+	elif args.codon_optimization_mode == "Dicodon":
+		objectives += [MaximizeDicodonAdaptiveIndex(species=args.species, location=location, boost=args.codon_optimization_boost)]
 	else:
-		opt_mode = 'best_codon'
-	objectives += [
-		CodonOptimize(species=args.species, location=location, mode=opt_mode)
-	]
+		#do nothing :)
+		pass
+
 	constraints += [
 		EnforceTranslation(location=location)
 	]
@@ -202,7 +205,7 @@ def load_user_options(args, f_location):
 	if args.avoid_patterns:
 		constraints += [AvoidPattern(pattern,location=location) for pattern in args.avoid_patterns]
 
-	#NOTE! Printing this to a template is broken
+	#NOTE! Printing this to a template is broken in 1.1
 	if args.avoid_restriction_sites:
 		constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.avoid_restriction_sites]
 
@@ -215,11 +218,9 @@ def load_user_options(args, f_location):
 	if args.constrain_terminal_GC_content:
 		constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
 
-	if args.constrain_CAI:
-		constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
+	#if args.constrain_CAI:
+	#	constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
 
-	if args.optimize_dicodon_frequency:
-		objectives += [MaximizeDicodonAdaptiveIndex()]
 
 	if args.kmers:
 		objectives += [MinimizeKmerScore(k=args.kmers, boost=args.avoid_kmers_boost, location=location)]
@@ -325,12 +326,12 @@ def parse_user_args():
 
 	optimizer_parser = parser.add_argument_group(title="Optimizer Options", description="These are only used if a vector is not specified or if create_template is set.")
 	#Optimization Arguments
-	optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh). Turns off all non-critical objectives and constraints")
-
+	#optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh). Turns off all non-critical objectives and constraints")
+	optimizer_parser.add_argument("--codon_optimization_mode",choices=["CAI","Harmonize","Dicodon","Robby","None"],default="CAI",help="Choose the method with which to optimize the DNA sequence. CAI chooses the best codon available, Harmonize makes the gene's codon frequency match that of the host, Dicodon maximizes the gene's dicodon frequency according to that of the host (experimental), Robby removes rare codons only, and None performs no codon optimization. Default: %(default)s")
 	#optimizer options
-	optimizer_parser.add_argument("--species", dest="species", default="e_coli", help="specifies the codon and dicodon bias tables to use. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
-	optimizer_parser.add_argument("--codon_optimization_boost", dest="codon_optimization_boost", help="Give a multiplier to the codon optimizer itself. Default to %(default)f", default=1.0)
-	optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible.", default=False, action="store_true")
+	optimizer_parser.add_argument("--species", dest="species", default="e_coli", help="specifies the codon bias tables to use. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
+	optimizer_parser.add_argument("--codon_optimization_boost", help="Give a multiplier to the codon optimizer itself. Default to %(default)f", default=1.0)
+	#optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible.", default=False, action="store_true")
 
 	optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", type=bool, default=True, help="Removes hairpins according to IDT's definition of a hairpin. A quicker and dirtier alternative to avoid_secondary_structure. Default to %(default)s")
 
@@ -357,10 +358,10 @@ def parse_user_args():
 	optimizer_parser.add_argument("--terminal_GC_content_max", type=float, default=0.9, help="TODO")
 	optimizer_parser.add_argument("--terminal_GC_content_window", type=int, default=16, help="TODO")
 
-	optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
-	optimizer_parser.add_argument("--constrain_CAI_minimum", type=float, default=0.8, help="TODO")
+	#optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
+	#optimizer_parser.add_argument("--constrain_CAI_minimum", type=float, default=0.8, help="TODO")
 
-	optimizer_parser.add_argument("--optimize_dicodon_frequency", type=bool, default=False, help="TODO")
+	#optimizer_parser.add_argument("--optimize_dicodon_frequency", type=bool, default=False, help="TODO")
 
 	optimizer_parser.add_argument("--avoid_secondary_structure", type=bool, default=False, help="TODO")
 	optimizer_parser.add_argument("--avoid_secondary_structure_max_e", type=float, default=-5.0, help="TODO")
@@ -465,29 +466,27 @@ if __name__ == "__main__":
 		before_aa = insert_location.extract(naive_construct.seq).translate()
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
 
-		if args.optimize:
-			##optimize
-			try_num = 0
-			max_tries = 1
-			while True:
-				try:
-					print("attempting optimization of " + naive_construct.name)
-					problem.resolve_constraints()
-					problem.optimize()
-					problem.resolve_constraints(final_check=True)
+		##optimize
+		try_num = 0
+		max_tries = 1
+		while True:
+			try:
+				print("attempting optimization of " + naive_construct.name)
+				problem.resolve_constraints()
+				problem.optimize()
+				problem.resolve_constraints(final_check=True)
+				break
+			except NoSolutionError:
+				try_num += 1
+				if try_num < max_tries:
+					problem.max_random_iters += 1000
+					print(problem.constraints_text_summary())
+					print(problem.objectives_text_summary())
+					print("optimization of %s failed! Attempt %d of %d. Trying again with %d random iters" % (naive_construct.name, try_num + 1, max_tries, problem.max_random_iters))
+				else:
+					print("optimization of %s failed!" % (naive_construct.name))
+					#problem.sequence = ""
 					break
-				except NoSolutionError:
-					try_num += 1
-					if try_num < max_tries:
-						problem.max_random_iters += 1000
-						print(problem.constraints_text_summary())
-						print(problem.objectives_text_summary())
-						print("optimization of %s failed! Attempt %d of %d. Trying again with %d random iters" % (naive_construct.name, try_num + 1, max_tries, problem.max_random_iters))
-					else:
-						print("optimization of %s failed!" % (naive_construct.name))
-						#problem.sequence = ""
-						break
-
 
 		print(problem.constraints_text_summary())
 		print(problem.objectives_text_summary())
