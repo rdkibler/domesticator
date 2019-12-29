@@ -135,10 +135,10 @@ def get_token(token_file, user_info,verbose=False):
                 token = get_stored_token(token_file)
                 if current_time - modified_time > token["expires_in"]:
                         vprint("token expired",verbose)
-			get_token_flag = True
-        else:
+                        get_token_flag = True
+	else:
                 vprint(f"no file found at {token_file}",verbose)
-		get_token_flag = True
+                get_token_flag = True
 
 	if get_token_flag:
                 token = get_new_token(user_info)
