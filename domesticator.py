@@ -373,7 +373,7 @@ def parse_user_args():
 
 	output_parser = parser.add_argument_group(title="Output Options", description=None)
 	#Output Arguments
-	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'fasta_oneline', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
+	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'terminal_oneline', 'fasta', 'fasta_oneline', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
 	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
 	return parser.parse_args()
@@ -534,6 +534,9 @@ if __name__ == "__main__":
 		for output in outputs:
 			output.description = ""
 			print(output.format("fasta"))
+	elif args.output_mode == 'terminal_oneline':
+		for output in outputs:
+			print(f">{output.name}\n{output.seq}")
 	elif args.output_mode == 'fasta_oneline':
 		with open(args.output_filename,'w') as f:
 			for output in outputs:
