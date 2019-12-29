@@ -118,7 +118,7 @@ def get_new_token(user_info, verbose=False):
 			vprint(f"ERROR: {response_dict['Message']}\nTrying again in 5 seconds...",verbose)
 			time.sleep(5)
 	if "access_token" not in response_dict:
-		exit("Could not get access token")
+		raise RuntimeError("Could not get access token")
 	return response_dict
 
 def get_stored_token(token_file):
