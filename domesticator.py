@@ -211,10 +211,15 @@ def load_user_options(args, f_location):
 
 	#if args.constrain_global_GC_content:
 	global_GC_min, global_GC_max = args.global_GC
+	global_GC_min = float(global_GC_min)
+	global_GC_max = float(global_GC_max)
 	constraints += [EnforceGCContent(mini=global_GC_min, maxi=global_GC_max, location=location)]
 
 	#if args.constrain_local_GC_content:
 	local_GC_min, local_GC_max, local_GC_window = args.local_GC
+	local_GC_min = float(local_GC_min)
+	local_GC_max = float(local_GC_max)
+	local_GC_window = int(local_GC_window)
 	constraints += [EnforceGCContent(mini=local_GC_min, maxi=local_GC_max, window=local_GC_window, location=location)]
 
 	#if args.constrain_terminal_GC_content:
@@ -346,7 +351,7 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="Enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII", nargs="*", metavar="enzy", type=str)
 
-	optimizer_parser.add_argument("--constrain_global_GC_content", nargs=2, default=[0.4,0.65], dest="global_GC", metavar=['min','max'], help="Constrain the global GC content of the optimized sequence.")
+	optimizer_parser.add_argument("--constrain_global_GC_content", nargs=2, default=[0.4,0.65], dest="global_GC", metavar=('min','max'), help="Constrain the global GC content of the optimized sequence.")
 	optimizer_parser.add_argument("--constrain_local_GC_content", nargs=3, default=[0.25,0.8,50], dest="local_GC", metavar=('min','max','window'), help="Constrain the local GC content of the optimized sequence.")
 
 	#optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
@@ -368,7 +373,7 @@ def parse_user_args():
 
 	output_parser = parser.add_argument_group(title="Output Options", description=None)
 	#Output Arguments
-	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
+	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'fasta_oneline', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
 	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
 	return parser.parse_args()
@@ -529,7 +534,11 @@ if __name__ == "__main__":
 		for output in outputs:
 			output.description = ""
 			print(output.format("fasta"))
-	elif args.output_mode:
+	elif args.output_mode == 'fasta_oneline':
+		with open(args.output_filename,'w') as f:
+			for output in outputs:
+				f.write(f">{output.name}\n{output.seq}\n")
+	else:
 		for output in outputs:
 			output.description = ""
 		SeqIO.write(outputs, args.output_filename, args.output_mode)
