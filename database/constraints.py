@@ -5,6 +5,19 @@ from CAI import CAI
 
 #how to write constriaints?
 
+import idt
+
+
+class ConstrainComplexity(Specification):
+        """Use IDT's API to ensure sequence can be synthesized"""
+        def __init__(self, max_score=10, location=None, verbose=True):
+                self.location = location
+                self.max_score = max_score
+                user_info = idt.get_user_info(idt.user_info_file)
+                self.token = idt.get_token(idt.token_file, user_info, verbose)
+
+
+
 class AvoidHiddenStops(Specification):
 	
 	def __init__(self):

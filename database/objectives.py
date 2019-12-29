@@ -5,7 +5,6 @@ from CAI import CAI
 import json
 from dnachisel.Location import Location
 
-
 class MinimizeKmerScore(Specification):
 	"""Minimize a "no-kmers" score."""
 

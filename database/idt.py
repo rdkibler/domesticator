@@ -94,6 +94,7 @@ def store_token(token,token_file):
 
 
 def get_new_token(user_info, verbose=False):
+	vprint("getting new token", verbose)
 	client_info = user_info["ID"]+":"+user_info["secret"]
 	byte_encoded_client_info = client_info.encode("utf-8")
 	base64_client_info = base64.urlsafe_b64encode(byte_encoded_client_info).decode('utf8')
@@ -125,6 +126,26 @@ def get_stored_token(token_file):
 	with open(token_file,'r') as f:
 		return json.load(f)
 
+def get_token(token_file, user_info,verbose=False):
+	get_token_flag = False
+	if os.path.exists(token_file):
+                vprint(f"using token stored at {token_file}",verbose)
+                modified_time = os.path.getmtime(token_file)
+                current_time = time.time()
+                token = get_stored_token(token_file)
+                if current_time - modified_time > token["expires_in"]:
+                        vprint("token expired",verbose)
+			get_token_flag = True
+        else:
+                vprint(f"no file found at {token_file}",verbose)
+		get_token_flag = True
+
+	if get_token_flag:
+                token = get_new_token(user_info)
+                vprint(f"storing token at {token_file}",verbose)
+                store_token(token,token_file)
+	return token
+
 def query_complexity(seq, token,verbose=False):
 	vprint("querying complexity",verbose)
 	url = "https://www.idtdna.com/api/complexities/screengBlockSequences"
@@ -155,22 +176,9 @@ def main():
 		exit("token deleted")
 
 	if args.new_token:
-		vprint("requesting new token",args.verbose)
-		token = get_new_token(user_info)
+		token = get_new_token(user_info, args.verbose)
 	else:
-		if os.path.exists(token_file):
-			vprint(f"using token stored at {token_file}",args.verbose)
-			modified_time = os.path.getmtime(token_file)
-			current_time = time.time()
-			token = get_stored_token(token_file)
-			if current_time - modified_time > token["expires_in"]:
-				vprint("token expired, requesting new token",args.verbose)
-				token = get_new_token(user_info)
-				args.store_token = True
-		else:
-			vprint(f"no file found at {token_file}. Requesting new token",args.verbose)
-			token = get_new_token(user_info)
-			args.store_token = True
+		token = get_token(token_file, user_info, args.verbose)
 
 	if args.store_token:
 		vprint(f"storing token at {token_file}",args.verbose)
@@ -185,18 +193,32 @@ def main():
 			response = query_complexity(seq,token["access_token"])
 			if len(response[0]) == 0:
 				print("no issue!")
+			score_sum = 0
 			for issue in response[0]:
-				print(issue)
+				vprint(issue,args.verbose)
+				print(issue["Score"],issue["Name"])
+				score_sum += issue["Score"]
+			print(f"Total Score: {score_sum}")
+
+
 	else:
 		for seq in args.seqs:
 			response = query_complexity(seq,token["access_token"])
 			if len(response[0]) == 0:
 				print("no issue!")
+			score_sum = 0
 			for issue in response[0]:
-				print(issue)
-
+				vprint(issue,args.verbose)
+				print(issue["Score"],issue["Name"])
+				score_sum += issue["Score"]
+			print(f"Total Score: {score_sum}")
 
 
 
 if __name__ == "__main__":
 	main()
+"""
+Accepted - Moderate Complexity (Scores between 7 and 19)
+
+Some complexities exist that may interfere with or delay manufacturing. If it is possible to reduce these complexities please do so, otherwise we will attempt this order.
+"""

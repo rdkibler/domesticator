@@ -24,6 +24,7 @@ from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.Alphabet import IUPAC
 #from constraints import ConstrainCAI
 from objectives import MinimizeSecondaryStructure, MinimizeKmerScore, MaximizeDicodonAdaptiveIndex
+from constraints import ConstrainComplexity
 import os
 import copy
 
@@ -35,7 +36,8 @@ CUSTOM_SPECIFICATIONS_DICT.update({
 #    'ConstrainCAI': ConstrainCAI,
     'MinimizeSecondaryStructure': MinimizeSecondaryStructure,
     'MinimizeKmerScore': MinimizeKmerScore,
-    'MaximizeDicodonAdaptiveIndex' : MaximizeDicodonAdaptiveIndex
+    'MaximizeDicodonAdaptiveIndex' : MaximizeDicodonAdaptiveIndex,
+    'ConstrainComplexity' : ConstrainComplexity
 })
 
 def load_template(filename, insert, destination):
@@ -225,6 +227,9 @@ def load_user_options(args, f_location):
 	#if args.constrain_terminal_GC_content:
 	#	constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
 
+	if args.constrain_complexity:
+		constraints += [ConstrainComplexity(location=location, verbose=True)]
+
 	#if args.constrain_CAI:
 	#	constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
 
@@ -353,7 +358,7 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--constrain_global_GC_content", nargs=2, default=[0.4,0.65], dest="global_GC", metavar=('min','max'), help="Constrain the global GC content of the optimized sequence.")
 	optimizer_parser.add_argument("--constrain_local_GC_content", nargs=3, default=[0.25,0.8,50], dest="local_GC", metavar=('min','max','window'), help="Constrain the local GC content of the optimized sequence.")
-
+	optimizer_parser.add_argument("--constrain_complexity", default=False, action="store_true",help="Use IDT's complexity screening API to ensure that they can synthesize it")
 	#optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
 	#optimizer_parser.add_argument("--constrain_CAI_minimum", type=float, default=0.8, help="TODO")
 
