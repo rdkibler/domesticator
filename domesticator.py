@@ -1,15 +1,17 @@
-#!/home/rdkibler/.conda/envs/domesticator/bin/python3
+#!/home/rdkibler/.conda/envs/domesticator_py36/bin/python3
 
 ##also look into pytest
 import sys
+import os
 
-database='/home/rdkibler/projects/domesticator/database/'
+script_dir = os.path.dirname(os.path.realpath(__file__))
+database=os.path.join(script_dir,'database')
 sys.path.insert(0, database)
 
 #import json
 from collections import Counter
 #from dnachisel import *
-from dnachisel import EnforceTranslation, AvoidChanges, DnaOptimizationProblem, CodonOptimize, AvoidPattern, HomopolymerPattern, EnzymeSitePattern, EnforceGCContent, EnforceTerminalGCContent, AvoidHairpins, NoSolutionError
+from dnachisel import EnforceTranslation, AvoidChanges, DnaOptimizationProblem, CodonOptimize, AvoidPattern, HomopolymerPattern, EnzymeSitePattern, EnforceGCContent, EnforceTerminalGCContent, AvoidHairpins, NoSolutionError, MaximizeCAI, AvoidRareCodons
 from dnachisel import Location
 from dnachisel import reverse_translate
 import argparse
@@ -20,20 +22,20 @@ from Bio.Seq import MutableSeq, Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.Alphabet import IUPAC
-#from Bio.PDB import PDBParser, PPBuilder
-from constraints import ConstrainCAI
-from objectives import MinimizeSecondaryStructure, MinimizeKmerScore
+#from constraints import ConstrainCAI
+from objectives import MinimizeSecondaryStructure, MinimizeKmerScore, MaximizeDicodonAdaptiveIndex
 import os
 import copy
 
-from dnachisel.DnaOptimizationProblem import DEFAULT_SPECIFICATIONS_DICT
+from dnachisel import DEFAULT_SPECIFICATIONS_DICT
 
 
 CUSTOM_SPECIFICATIONS_DICT = copy.deepcopy(DEFAULT_SPECIFICATIONS_DICT)
 CUSTOM_SPECIFICATIONS_DICT.update({
-    'ConstrainCAI': ConstrainCAI,
+#    'ConstrainCAI': ConstrainCAI,
     'MinimizeSecondaryStructure': MinimizeSecondaryStructure,
-    'MinimizeKmerScore': MinimizeKmerScore
+    'MinimizeKmerScore': MinimizeKmerScore,
+    'MaximizeDicodonAdaptiveIndex' : MaximizeDicodonAdaptiveIndex
 })
 
 def load_template(filename, insert, destination):
@@ -76,11 +78,7 @@ def replace_sequence_in_record(record, location, new_seq):
 	else:
 		adjusted_seq = record.seq[:location.start] + new_seq.reverse_complement().seq + record.seq[location.end:]
 
-	#exit(adjusted_seq)
 	record.seq = adjusted_seq
-
-	#print(help(location))
-	#exit(dir(location))
 
 	seq_diff = len(new_seq) - len(location)
 	orig_start = location.start
@@ -178,13 +176,18 @@ def load_user_options(args, f_location):
 	constraints = []
 	objectives = []
 
-	if args.harmonized:
-		opt_mode = 'harmonized'
+	if args.codon_optimization_mode == "CAI":
+		objectives += [MaximizeCAI(species=args.species, location=location,boost=args.codon_optimization_boost)]
+	elif args.codon_optimization_mode == "Harmonize":
+		objectives += [MatchTargetCodonUsage(species=args.species, location=location,boost=args.codon_optimization_boost)]
+	elif args.codon_optimization_mode == "Robby":
+		objectives += [AvoidRareCodons(min_frequency=0.1,species=args.species, location=location,boost=args.codon_optimization_boost)]
+	elif args.codon_optimization_mode == "Dicodon":
+		objectives += [MaximizeDicodonAdaptiveIndex(species=args.species, location=location, boost=args.codon_optimization_boost)]
 	else:
-		opt_mode = 'best_codon'
-	objectives += [
-		CodonOptimize(species=args.species, location=location, mode=opt_mode)
-	]
+		#do nothing :)
+		pass
+
 	constraints += [
 		EnforceTranslation(location=location)
 	]
@@ -202,24 +205,29 @@ def load_user_options(args, f_location):
 	if args.avoid_patterns:
 		constraints += [AvoidPattern(pattern,location=location) for pattern in args.avoid_patterns]
 
-	#NOTE! Printing this to a template is broken
+	#NOTE! Printing this to a template is broken in 1.1
 	if args.avoid_restriction_sites:
 		constraints += [AvoidPattern(EnzymeSitePattern(enzy),location=location) for enzy in args.avoid_restriction_sites]
 
-	if args.constrain_global_GC_content:
-		constraints += [EnforceGCContent(mini=args.global_GC_content_min, maxi=args.global_GC_content_max, location=location)]
+	#if args.constrain_global_GC_content:
+	global_GC_min, global_GC_max = args.global_GC
+	global_GC_min = float(global_GC_min)
+	global_GC_max = float(global_GC_max)
+	constraints += [EnforceGCContent(mini=global_GC_min, maxi=global_GC_max, location=location)]
 
-	if args.constrain_local_GC_content:
-		constraints += [EnforceGCContent(mini=args.local_GC_content_min, maxi=args.global_GC_content_max, window=args.local_GC_content_window, location=location)]
+	#if args.constrain_local_GC_content:
+	local_GC_min, local_GC_max, local_GC_window = args.local_GC
+	local_GC_min = float(local_GC_min)
+	local_GC_max = float(local_GC_max)
+	local_GC_window = int(local_GC_window)
+	constraints += [EnforceGCContent(mini=local_GC_min, maxi=local_GC_max, window=local_GC_window, location=location)]
 
-	if args.constrain_terminal_GC_content:
-		constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
+	#if args.constrain_terminal_GC_content:
+	#	constraints += [EnforceTerminalGCContent(mini=args.terminal_GC_content_min, maxi=args.terminal_GC_content_max, window_size=8, location=location)]
 
-	if args.constrain_CAI:
-		constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
+	#if args.constrain_CAI:
+	#	constraints += [ConstrainCAI(species=args.species, minimum=args.constrain_CAI_minimum, location=location)]
 
-	if args.optimize_dicodon_frequency:
-		objectives += [MaximizeDicodonAdaptiveIndex()]
 
 	if args.kmers:
 		objectives += [MinimizeKmerScore(k=args.kmers, boost=args.avoid_kmers_boost, location=location)]
@@ -308,7 +316,7 @@ def load_inserts(inputs):
 def parse_user_args():
 	parser=argparse.ArgumentParser(prog='domesticator', description='The coolest codon optimizer on the block')
 
-	parser.add_argument('--version', action='version', version='%(prog)s 0.3')
+	parser.add_argument('--version', action='version', version='%(prog)s 0.5')
 
 	input_parser = parser.add_argument_group(title="Input Options", description=None)
 	#input_parser.add_argument("input",							 			type=str, 	default=None, 			nargs="+",	help="DNA or protein sequence(s) or file(s) to be optimized. Valid inputs are full DNA or protein sequences or fasta or genbank files. Default input is a list of protein sequences. To use a different input type, set --input_mode to the input type.")
@@ -325,12 +333,12 @@ def parse_user_args():
 
 	optimizer_parser = parser.add_argument_group(title="Optimizer Options", description="These are only used if a vector is not specified or if create_template is set.")
 	#Optimization Arguments
-	optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh). Turns off all non-critical objectives and constraints")
-
+	#optimizer_parser.add_argument("--no_opt", dest="optimize", action="store_false", default=True, help="Turn this on if you want to insert the input sequence or a naive back-translation of your protein. Not recommended (duh). Turns off all non-critical objectives and constraints")
+	optimizer_parser.add_argument("--codon_optimization_mode",choices=["CAI","Harmonize","Dicodon","Robby","None"],default="CAI",help="Choose the method with which to optimize the DNA sequence. CAI chooses the best codon available, Harmonize makes the gene's codon frequency match that of the host, Dicodon maximizes the gene's dicodon frequency according to that of the host (experimental), Robby removes rare codons only, and None performs no codon optimization. Default: %(default)s")
 	#optimizer options
-	optimizer_parser.add_argument("--species", dest="species", default="e_coli", help="specifies the codon and dicodon bias tables to use. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
-	optimizer_parser.add_argument("--codon_optimization_boost", dest="codon_optimization_boost", help="Give a multiplier to the codon optimizer itself. Default to %(default)f", default=1.0)
-	optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible.", default=False, action="store_true")
+	optimizer_parser.add_argument("--species", dest="species", default="e_coli", help="specifies the codon bias tables to use. Defaults to %(default)s", choices=["e_coli", "s_cerevisiae", "h_sapiens"])
+	optimizer_parser.add_argument("--codon_optimization_boost", help="Give a multiplier to the codon optimizer itself. Default to %(default)f", default=1.0)
+	#optimizer_parser.add_argument("--harmonized", dest="harmonized", help="This will tell the algorithm to choose codons with the same frequency as they appear in nature, otherwise it will pick the best codon as often as possible.", default=False, action="store_true")
 
 	optimizer_parser.add_argument("--avoid_hairpins", dest="avoid_hairpins", type=bool, default=True, help="Removes hairpins according to IDT's definition of a hairpin. A quicker and dirtier alternative to avoid_secondary_structure. Default to %(default)s")
 
@@ -343,24 +351,13 @@ def parse_user_args():
 
 	optimizer_parser.add_argument("--avoid_restriction_sites", dest="avoid_restriction_sites", help="Enzymes whose restriction sites you wish to avoid, such as EcoRI or BglII", nargs="*", metavar="enzy", type=str)
 
-	optimizer_parser.add_argument("--constrain_global_GC_content", type=bool, default=True, help="TODO")
-	optimizer_parser.add_argument("--global_GC_content_min", type=float, default=0.4, help="TODO")
-	optimizer_parser.add_argument("--global_GC_content_max", type=float, default=0.65, help="TODO")
+	optimizer_parser.add_argument("--constrain_global_GC_content", nargs=2, default=[0.4,0.65], dest="global_GC", metavar=('min','max'), help="Constrain the global GC content of the optimized sequence.")
+	optimizer_parser.add_argument("--constrain_local_GC_content", nargs=3, default=[0.25,0.8,50], dest="local_GC", metavar=('min','max','window'), help="Constrain the local GC content of the optimized sequence.")
 
-	optimizer_parser.add_argument("--constrain_local_GC_content", type=bool, default=True, help="TODO")
-	optimizer_parser.add_argument("--local_GC_content_min", type=float, default=0.25, help="TODO")
-	optimizer_parser.add_argument("--local_GC_content_max", type=float, default=0.8, help="TODO")
-	optimizer_parser.add_argument("--local_GC_content_window", type=int, default=50, help="TODO")
+	#optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
+	#optimizer_parser.add_argument("--constrain_CAI_minimum", type=float, default=0.8, help="TODO")
 
-	optimizer_parser.add_argument("--constrain_terminal_GC_content", type=bool, default=False, help="TODO")
-	optimizer_parser.add_argument("--terminal_GC_content_min", type=float, default=0.5, help="TODO")
-	optimizer_parser.add_argument("--terminal_GC_content_max", type=float, default=0.9, help="TODO")
-	optimizer_parser.add_argument("--terminal_GC_content_window", type=int, default=16, help="TODO")
-
-	optimizer_parser.add_argument("--constrain_CAI", type=bool, default=False, help="TODO")
-	optimizer_parser.add_argument("--constrain_CAI_minimum", type=float, default=0.8, help="TODO")
-
-	optimizer_parser.add_argument("--optimize_dicodon_frequency", type=bool, default=False, help="TODO")
+	#optimizer_parser.add_argument("--optimize_dicodon_frequency", type=bool, default=False, help="TODO")
 
 	optimizer_parser.add_argument("--avoid_secondary_structure", type=bool, default=False, help="TODO")
 	optimizer_parser.add_argument("--avoid_secondary_structure_max_e", type=float, default=-5.0, help="TODO")
@@ -374,10 +371,9 @@ def parse_user_args():
 	ordering_parser = parser.add_argument_group(title="Ordering Options", description=None)
 	ordering_parser.add_argument("--order_type", choices=["gBlocks","genes"], default=None, help="Choose how you'll order your sequences through IDT and you'll get a file called to_order.fasta that you can directly submit")
 
-
 	output_parser = parser.add_argument_group(title="Output Options", description=None)
 	#Output Arguments
-	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
+	output_parser.add_argument("--output_mode", dest="output_mode", default="terminal", choices=['terminal', 'fasta', 'fasta_oneline', 'genbank', 'none'], help="Default: %(default)s\n Choose a mode to export complete sequences in the vector, if specified.")
 	output_parser.add_argument("--output_filename", dest="output_filename", help="defaults to %(default)s.fasta or %(default)s.gb", default="domesticator_output")
 
 	return parser.parse_args()
@@ -465,29 +461,27 @@ if __name__ == "__main__":
 		before_aa = insert_location.extract(naive_construct.seq).translate()
 		problem = DnaOptimizationProblem(str(naive_construct.seq), constraints=constraints, objectives=objectives)
 
-		if args.optimize:
-			##optimize
-			try_num = 0
-			max_tries = 1
-			while True:
-				try:
-					print("attempting optimization of " + naive_construct.name)
-					problem.resolve_constraints()
-					problem.optimize()
-					problem.resolve_constraints(final_check=True)
+		##optimize
+		try_num = 0
+		max_tries = 1
+		while True:
+			try:
+				print("attempting optimization of " + naive_construct.name)
+				problem.resolve_constraints()
+				problem.optimize()
+				problem.resolve_constraints(final_check=True)
+				break
+			except NoSolutionError:
+				try_num += 1
+				if try_num < max_tries:
+					problem.max_random_iters += 1000
+					print(problem.constraints_text_summary())
+					print(problem.objectives_text_summary())
+					print("optimization of %s failed! Attempt %d of %d. Trying again with %d random iters" % (naive_construct.name, try_num + 1, max_tries, problem.max_random_iters))
+				else:
+					print("optimization of %s failed!" % (naive_construct.name))
+					#problem.sequence = ""
 					break
-				except NoSolutionError:
-					try_num += 1
-					if try_num < max_tries:
-						problem.max_random_iters += 1000
-						print(problem.constraints_text_summary())
-						print(problem.objectives_text_summary())
-						print("optimization of %s failed! Attempt %d of %d. Trying again with %d random iters" % (naive_construct.name, try_num + 1, max_tries, problem.max_random_iters))
-					else:
-						print("optimization of %s failed!" % (naive_construct.name))
-						#problem.sequence = ""
-						break
-
 
 		print(problem.constraints_text_summary())
 		print(problem.objectives_text_summary())
@@ -540,7 +534,11 @@ if __name__ == "__main__":
 		for output in outputs:
 			output.description = ""
 			print(output.format("fasta"))
-	elif args.output_mode:
+	elif args.output_mode == 'fasta_oneline':
+		with open(args.output_filename,'w') as f:
+			for output in outputs:
+				f.write(f">{output.name}\n{output.seq}\n")
+	else:
 		for output in outputs:
 			output.description = ""
 		SeqIO.write(outputs, args.output_filename, args.output_mode)

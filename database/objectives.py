@@ -62,51 +62,56 @@ S_CEREVISIAE_WTS = "/home/rdkibler/projects/domesticator/database/CAI/scTable.wt
 #Then unzip and run that though make_weights.py in /home/rdkibler/projects/domesticator/database/CAI/make_weights.py
 
 
-class MaximizeCAI(Specification):
-	"""Maximizes CAI. Uses https://github.com/Benjamin-Lee/CodonAdaptationIndex/. 
-	
-	"""
-	def __init__(self, species, location=None, boost=1.0):
-		self.boost = boost
-		self.location = location
-		if species == "e_coli":
-			self.weights = json.load(open(E_COLI_WTS))
-		elif species == "h_sapiens":
-			self.weights = json.load(open(H_SAPIENS_WTS))
-		elif species == "s_cerevisiae":
-			self.weights = json.load(open(S_CEREVISIAE_WTS))
+#class MaximizeCAI(Specification):
+#	"""Maximizes CAI. Uses https://github.com/Benjamin-Lee/CodonAdaptationIndex/. 
+#	
+#	"""
+#	def __init__(self, species, location=None, boost=1.0):
+#		self.boost = boost
+#		self.location = location
+#		if species == "e_coli":
+#			self.weights = json.load(open(E_COLI_WTS))
+#		elif species == "h_sapiens":
+#			self.weights = json.load(open(H_SAPIENS_WTS))
+#		elif species == "s_cerevisiae":
+#			self.weights = json.load(open(S_CEREVISIAE_WTS))
+#
+#
+#	def initialize_on_problem(self, problem, role=None):
+#		return self._copy_with_full_span_if_no_location(problem)
+#		# if self.location is None:
+#		#     location = Location(0, len(problem.sequence))
+#		#     return self.copy_with_changes(location=location)
+#		# else:
+#		#     return self
+#
+#	def evaluate(self, problem):
+#		""" return a CAI for the problem's sequence"""
+#
+#		sequence = self.location.extract_sequence(problem.sequence)
+#
+#		score = CAI(sequence, weights=self.weights)
+#
+#		return SpecEvaluation(
+#			self, problem,
+#			score=score,
+#			locations=[self.location],
+#			message="CAI: %.02f" % (score)
+#		)
+#
+#	def __str__(self):
+#		"""String representation."""
+#		return "CAI"
+#
 
 
-	def initialize_on_problem(self, problem, role=None):
-		return self._copy_with_full_span_if_no_location(problem)
-		# if self.location is None:
-		#     location = Location(0, len(problem.sequence))
-		#     return self.copy_with_changes(location=location)
-		# else:
-		#     return self
-
-	def evaluate(self, problem):
-		""" return a CAI for the problem's sequence"""
-
-		sequence = self.location.extract_sequence(problem.sequence)
-
-		score = CAI(sequence, weights=self.weights)
-
-		return SpecEvaluation(
-			self, problem,
-			score=score,
-			locations=[self.location],
-			message="CAI: %.02f" % (score)
-		)
-
-	def __str__(self):
-		"""String representation."""
-		return "CAI"
 
 
 class MaximizeDicodonAdaptiveIndex(Specification):
-	def __init__(self):
-		raise NotImplementedError("AvoidAlternativeStarts not implmented")
+	def __init__(self, species, location=None, boost=1.0):
+		raise NotImplementedError("MaximizeDicodonAdaptiveIndex not implmented")
+
+
 
 
 #import RNA
