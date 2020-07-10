@@ -20,19 +20,65 @@ class ConstrainComplexity(Specification):
 
         def evaluate(self, problem):
                 self.call_counter += 1
-                print(f"ConstrainComplexity Call \#{self.call_counter}!")
-                response = query_complexity(seq,self.token["access_token"])
+
+                print(f"ConstrainComplexity Call #{self.call_counter}! {problem.objectives}")
+                #hm you can access problem.objectives. Might be able to turn up to boost...
+
+                known_issues_with_locs = [
+                                "Hairpin Length",
+                                "Windowed Hairpin High GC",
+                                "SSA Repeat 3'",
+                                "SSA Repeat 5'",
+                                "Pseudo Terminal Repeat",
+                                "Single Repeat Overall Bases (Fragment)",
+                                "Single Repeat Percentage",
+                                "Single Repeat Overall Bases",
+                                "Repeat Length (Fragment)",
+                                "Repeat Length",
+                                "Pseudo Terminal Repeat (Fragment)",
+                                "Single Repeat Percentage (Fragment)",
+                                "SSA Repeat Palindrome 5'",
+                                "SSA Repeat Palindrome 3'"
+                        ]
+
+                known_issues_without_locs = [
+                                "3' Terminal Low GC",
+                                "5' Terminal Low GC",
+                                "SSA Low GC 5'",
+                                "SSA Low GC 3'",
+                                "SSA High GC 5'",
+                                "SSA High GC 3'",
+                                "Overall Repeat",
+                                "Windowed Repeat Percentage"
+                        ]
+
+                response = idt.query_complexity(problem.sequence,self.token["access_token"])
                 if len(response[0]) == 0:
                         message = "no issue!"
-
-                locations = []
+                score = 0
+                locations = set()
 
                 for issue in response[0]:
-                        vprint(issue,self.verbose)
+                        #idt.vprint(issue,self.verbose)
                         print(issue["Score"],issue["Name"])
-                        locations.append(None)
+
+                        name = issue["Name"]
+                        if name in known_issues_with_locs:
+                                issue_length = len(issue["RepeatedSegment"])
+                                for start in issue["ForwardLocations"]:
+                                        locations.add(Location(start + 1, start + issue_length + 1, 1))
+				#could be a bug in the next block
+                                for start in issue["ReverseLocations"]:
+                                        locations.add(Location(start + 1, start + issue_length + 1, -1))
+
+                        elif name in known_issues_without_locs:
+                                locations.add(self.location)
+                        else:
+                                print(issue)
+                                print(f"UNKNOWN ISSUE: \"{name}\"")
+
                         score += issue["Score"]
-                print(f"Total Score: {score_sum}")
+                print(f"Total Score: {score}")
 
 
                 if score < self.max_score:
@@ -40,10 +86,15 @@ class ConstrainComplexity(Specification):
                 else:
                         message = f"Failed. Complexity score {score} is greater than {self.max_score}"
 
+                #this passes if the reported score is >= 0, so I need to negate the score and add self.max_score
+                
+                #score = -1000
+                #locations = [self.location]
+                #message = "this is a temp message"
                 return SpecEvaluation(
                         self, problem,
-                        score=-score,
-                        locations=locations,
+                        score=self.max_score - score,
+                        locations=list(locations),
                         message=message
                 )
 
